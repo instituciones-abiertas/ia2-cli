@@ -58,11 +58,21 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
 class SpacyConverterTrainer:
     """
     Convertidor de formato Dataturks a Spacy y eliminador de repetidos .
+
+    Metodos disponibles:
+    create_blank_model(path_save_model: str)--> Crea un modelo en blanco
+    create_custom_spacy_model(spacy_model: str, path_save_model: str)--> crea un modelo partiendo de un modelo de  spacy
+    add_new_entity_to_model(ents: list, model_path: str)--> Agrega nuevas entidades para entrenar al modelo
+    train_model(
+        path_data_training: str, n_iter: int, model_path: str, ents: list
+    )--> Entrena un modelo n_iter veces con la data en formato dataturks pasada.
     """
 
     def create_blank_model(self, path_save_model: str):
         """
         Crea un modelo en blanco .
+        :param path_save_model: path donde se guardar el modelo
+
         """
         nlp = spacy.blank("es")
         nlp.to_disk(path_save_model)
@@ -71,27 +81,41 @@ class SpacyConverterTrainer:
     def create_custom_spacy_model(self, spacy_model: str, path_save_model: str):
         """
         Crea un modelo en base al modelo pasado por parametro .
+        :param spacy_model: modelo de spacy a partir de base
+        :param path_save_model: path donde se guardar el modelo
+
         """
         nlp = spacy.load(spacy_model)
         nlp.to_disk(path_save_model)
         logger.info("Modelo creado exitosamente {path_save_model}...")
 
-    def add_new_entity_to_model(self, entity_list: list, model_path: str):
-        nlp = spacy.load(model_path)
+    def add_new_entity_to_model(self, ents: list, model_path: str):
+        """
+        Agrega nuevas entidades al modelo para entrenar
+        :param ents: lista de entidades a entrenar
+        :param model_path: path del modelo a  utilizar
 
-        # Agrega todas las labels que no existan al modelo
+        """
+
+        nlp = spacy.load(model_path)
+        ner = nlp.pipe_names
+        if not ner:
+            component = nlp.create_pipe("ner")
+            nlp.add_pipe(component)
         ner = nlp.get_pipe("ner")
-        for ent in entity_list:
+        for ent in ents:
             ner.add_label(ent)
+
         nlp.to_disk(model_path)
+
         logger.info("Agregados exitosamente las entidades al {model_path}...")
 
     def convert_dataturks_to_spacy(self, convert_data_path: str, output_path: str):
         """
         Dado una data en formato dataturks, la transforma para formato spacy.
-        :param convert_data_path:
-        :param model_path: path to save model to.
-        :param k: k-neighbors parameter of model.
+        :param convert_data_path: path del output de dataturks
+        :param output_path: path del archivo resultante
+
         """
         logger.info(f"Loading convert data from {convert_data_path} ...")
         f = open(output_path, "w")  # open a file in write mode
@@ -102,11 +126,18 @@ class SpacyConverterTrainer:
     def train_model(
         self, path_data_training: str, n_iter: int, model_path: str, ents: list
     ):
+        """
+        Dado una data en formato dataturks, la transforma para formato spacy.
+        :param path_data_training: path de la info a entrenar
+        :param n_iter: Numero de cantidad de veces que se va correr el scripts
+        :param model_path: path del modelo a  utilizar
+        :ents: lista de entidades a entrenar
+        """
 
         training_data = removeEntitiesNotInList(
             convert_dataturks_to_spacy(path_data_training), ents
         )
-
+        print(model_path)
         nlp = spacy.load(model_path)
 
         # get names of other pipes to disable them during training
@@ -117,7 +148,7 @@ class SpacyConverterTrainer:
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
-
+            nlp.begin_training()
             for itn in range(n_iter):
                 random.shuffle(training_data)  # Se randomiza
                 losses = {}
@@ -136,6 +167,16 @@ class SpacyConverterTrainer:
                 print("Losses", losses)
         # save model to output directory
         nlp.to_disk(model_path)
+
+    def get_entities(self, model_path: str, text: str):
+        """
+        Dado una data en formato dataturks, la transforma para formato spacy.
+        :param model_path:ruta del modelo
+        :param text: texto a traducir.
+        """
+        nlp = spacy.load(model_path, disable=["tagger", "parser"])
+        doc = nlp(text)
+        print(doc.ents)
 
 
 if __name__ == "__main__":
