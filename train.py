@@ -4,8 +4,11 @@ import pickle
 import logging
 import json
 import random
+import os
 import spacy
-from spacy.util import minibatch, compounding
+from spacy.util import minibatch, compounding, filter_spans
+from os import listdir
+from os.path import isfile, join
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,22 +34,51 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
         lines = []
         with open(dataturks_JSON_FilePath, "r") as f:
             lines = f.readlines()
-        for line in lines:
-            data = json.loads(line)
-            text = data["content"]
-            entities = []
-            for annotation in data["annotation"]:
-                # only a single point in text annotation.
-                point = annotation["points"][0]
-                labels = annotation["label"]
-                # handle both list of labels or a single label.
-                if not isinstance(labels, list):
-                    labels = [labels]
+            for line in lines:
+                # line=lines[0]
+                data = json.loads(line)
+                text = data["content"]
+                entities = []
+                annotations = []
+                for annotation in data["annotation"]:
+                    point = annotation["points"][0]
+                    label = annotation["label"]
+                    annotations.append(
+                        (
+                            point["start"],
+                            point["end"],
+                            label,
+                            point["end"] - point["start"],
+                        )
+                    )
+                print(annotations[3])
+                annotations = sorted(
+                    annotations, key=lambda student: student[3], reverse=True
+                )
+                print(annotations)
+                seen_tokens = set()
+                count_common = 0
+                count_overlaped = 0
+                for annotation in annotations:
 
-                for label in labels:
-                    # dataturks indices are both inclusive [start, end] but spacy is not [start, end)
-                    entities.append((point["start"], point["end"] + 1, label))
-            training_data.append((text, {"entities": entities}))
+                    start = annotation[0]
+                    end = annotation[1]
+                    labels = annotation[2]
+                    if start not in seen_tokens and end - 1 not in seen_tokens:
+                        count_common = count_common + 1
+                        seen_tokens.update(range(start, end))
+                    else:
+                        count_overlaped = count_overlaped + 1
+                        print("{} {} {} esta overlapeada".format(start, end, labels))
+                        if not isinstance(labels, list):
+                            labels = [labels]
+
+                        for label in labels:
+                            # dataturks indices are both inclusive [start, end] but spacy is not [start, end)
+                            entities.append((start, end + 1, label))
+                training_data.append((text, {"entities": entities}))
+        print(count_common)
+        print(count_overlaped)
         return training_data
     except Exception as e:
         logging.exception(
@@ -118,9 +150,13 @@ class SpacyConverterTrainer:
 
         """
         logger.info(f"Loading convert data from {convert_data_path} ...")
-        f = open(output_path, "w")  # open a file in write mode
-        f.write("".join(map(str, convert_dataturks_to_spacy(convert_data_path))))
-
+        training_data = []
+        log = convert_dataturks_to_spacy(convert_data_path)
+        print(log)
+        with open(output_path, "a+") as f:
+            training_data.append(convert_dataturks_to_spacy(convert_data_path))
+        with open(output_path, "wb") as output:
+            pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
         logger.info("Informacion convertida exitosamente")
 
     def train_model(
@@ -137,7 +173,6 @@ class SpacyConverterTrainer:
         training_data = removeEntitiesNotInList(
             convert_dataturks_to_spacy(path_data_training), ents
         )
-        print(model_path)
         nlp = spacy.load(model_path)
 
         # get names of other pipes to disable them during training
@@ -157,7 +192,6 @@ class SpacyConverterTrainer:
                 #
                 for batch in batches:
                     texts, annotations = zip(*batch)
-                    print(annotations)
                     nlp.update(
                         texts,  # batch of texts
                         annotations,  # batch of annotations
@@ -177,6 +211,19 @@ class SpacyConverterTrainer:
         nlp = spacy.load(model_path, disable=["tagger", "parser"])
         doc = nlp(text)
         print(doc.ents)
+
+    def all_files_in_folder(
+        self, path_folder: str, n_iter: int, model_path: str, ents: list
+    ):
+        """
+        Entrenar un modelo con todos los archivos en la carpeta actual.
+        :n_iter:numero de iteraciones
+        :param model_path:ruta del modelo
+        :param ents: Lista de las entidades a anonimizar.
+        """
+        onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
+        for file in onlyfiles:
+            self.train_model(path_folder + file, n_iter, model_path, ents)
 
 
 if __name__ == "__main__":
