@@ -14,16 +14,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+DROPOUT_RATE = 0.2  ## Configuracion del set de dropout del entrenamiento
+
+
 def removeEntitiesNotInList(spacyfile, entityList):
     # Esta funcion remueve de una training_data preparada para spacy ,todas las entidades que estan en la lista
     file = spacyfile
     newTrainingData = []
+
     for hit in file:
         entities = []
         data = hit[1]["entities"]
         for ent in data:
             if ent[2] in entityList:
+                print("Se conservo la entidad {}".format(ent[2]))
                 entities.append(ent)
+            else:
+                print("Se descarto la entidad {}".format(ent[2]))
         newTrainingData.append((hit[0], {"entities": entities}))
     return newTrainingData
 
@@ -51,11 +58,11 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
                             point["end"] - point["start"],
                         )
                     )
-                print(annotations[3])
+
                 annotations = sorted(
                     annotations, key=lambda student: student[3], reverse=True
                 )
-                print(annotations)
+
                 seen_tokens = set()
                 count_common = 0
                 count_overlaped = 0
@@ -77,8 +84,8 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
                             # dataturks indices are both inclusive [start, end] but spacy is not [start, end)
                             entities.append((start, end + 1, label))
                 training_data.append((text, {"entities": entities}))
-        print(count_common)
-        print(count_overlaped)
+        print("Entidades normales : {}".format(count_common))
+        print("Entidades overlopeadas : {}".format(count_overlaped))
         return training_data
     except Exception as e:
         logging.exception(
@@ -178,7 +185,13 @@ class SpacyConverterTrainer:
         # get names of other pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
+        ner = nlp.get_pipe("ner")
 
+        for _, annotations in training_data:
+            for ent in annotations.get("entities"):
+                ner.add_label(ent[2])
+
+        print(ner.move_names)
         # only train NER
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # show warnings for misaligned entity spans once
@@ -195,7 +208,7 @@ class SpacyConverterTrainer:
                     nlp.update(
                         texts,  # batch of texts
                         annotations,  # batch of annotations
-                        drop=0.5,  # dropout - make it harder to memorise data
+                        drop=DROPOUT_RATE,
                         losses=losses,
                     )
                 print("Losses", losses)
@@ -223,6 +236,7 @@ class SpacyConverterTrainer:
         """
         onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
         for file in onlyfiles:
+            print("Se esta procesando {}".format(file))
             self.train_model(path_folder + file, n_iter, model_path, ents)
 
 
