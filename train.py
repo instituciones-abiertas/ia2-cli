@@ -9,6 +9,7 @@ import os
 import re
 import spacy
 from spacy.util import minibatch, compounding, filter_spans
+from spacy.gold import biluo_tags_from_offsets
 from os import listdir
 from os.path import isfile, join
 
@@ -49,46 +50,52 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
                 text = data["content"]
                 entities = []
                 annotations = []
-                for annotation in data["annotation"]:
-                    point = annotation["points"][0]
-                    label = annotation["label"]
-
-                    if label[0] in entityList:
-                        print(label)
-                        annotations.append(
-                            (
-                                point["start"],
-                                point["end"],
-                                label,
-                                point["end"] - point["start"],
+                if data["annotation"]:
+                    for annotation in data["annotation"]:
+                        point = annotation["points"][0]
+                        label = annotation["label"]
+                        if label[0] in entityList:
+                            annotations.append(
+                                (
+                                    point["start"],
+                                    point["end"],
+                                    label,
+                                    point["end"] - point["start"],
+                                )
                             )
-                        )
+                    annotations = sorted(
+                        annotations, key=lambda student: student[3], reverse=True
+                    )
 
-                annotations = sorted(
-                    annotations, key=lambda student: student[3], reverse=True
-                )
+                    seen_tokens = set()
+                    count_common = 0
+                    count_overlaped = 0
+                    for annotation in annotations:
 
-                seen_tokens = set()
-                count_common = 0
-                count_overlaped = 0
-                for annotation in annotations:
+                        start = annotation[0]
+                        end = annotation[1]
+                        labels = annotation[2]
+                        if start not in seen_tokens and end - 1 not in seen_tokens:
+                            count_common = count_common + 1
+                            seen_tokens.update(range(start, end))
 
-                    start = annotation[0]
-                    end = annotation[1]
-                    labels = annotation[2]
-                    if start not in seen_tokens and end - 1 not in seen_tokens:
-                        count_common = count_common + 1
-                        seen_tokens.update(range(start, end))
-                    else:
-                        count_overlaped = count_overlaped + 1
-                        print("{} {} {} esta overlapeada".format(start, end, labels))
+                        else:
+                            count_overlaped = count_overlaped + 1
+                            print(
+                                "{} {} {} esta overlapeada".format(start, end, labels)
+                            )
+
                         if not isinstance(labels, list):
                             labels = [labels]
 
                         for label in labels:
                             # dataturks indices are both inclusive [start, end] but spacy is not [start, end)
                             entities.append((start, end + 1, label))
-                training_data.append((text, {"entities": entities}))
+                        print("Voy agregar estas entidades {}".format(entities))
+                        training_data.append((text, {"entities": entities}))
+                else:
+                    print("Esta vacia las entidades de {}".format(line))
+
         print("Entidades normales : {}".format(count_common))
         print("Entidades overlopeadas : {}".format(count_overlaped))
         return training_data
@@ -192,6 +199,7 @@ class SpacyConverterTrainer:
         ner = nlp.get_pipe("ner")
 
         for _, annotations in training_data:
+
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
 
