@@ -4,7 +4,9 @@ import pickle
 import logging
 import json
 import random
+import datetime
 import os
+import re
 import spacy
 from spacy.util import minibatch, compounding, filter_spans
 from os import listdir
@@ -27,7 +29,7 @@ def removeEntitiesNotInList(spacyfile, entityList):
         data = hit[1]["entities"]
         for ent in data:
             if ent[2] in entityList:
-                print("Se conservo la entidad {}".format(ent[2]))
+                # print("Se conservo la entidad {}".format(ent[2]))
                 entities.append(ent)
             else:
                 print("Se descarto la entidad {}".format(ent[2]))
@@ -35,14 +37,15 @@ def removeEntitiesNotInList(spacyfile, entityList):
     return newTrainingData
 
 
-def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
+def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
     try:
         training_data = []
         lines = []
+
         with open(dataturks_JSON_FilePath, "r") as f:
             lines = f.readlines()
             for line in lines:
-                # line=lines[0]
+                line = lines[0]
                 data = json.loads(line)
                 text = data["content"]
                 entities = []
@@ -50,14 +53,17 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath):
                 for annotation in data["annotation"]:
                     point = annotation["points"][0]
                     label = annotation["label"]
-                    annotations.append(
-                        (
-                            point["start"],
-                            point["end"],
-                            label,
-                            point["end"] - point["start"],
+
+                    if label[0] in entityList:
+                        print(label)
+                        annotations.append(
+                            (
+                                point["start"],
+                                point["end"],
+                                label,
+                                point["end"] - point["start"],
+                            )
                         )
-                    )
 
                 annotations = sorted(
                     annotations, key=lambda student: student[3], reverse=True
@@ -144,7 +150,7 @@ class SpacyConverterTrainer:
         ner = nlp.get_pipe("ner")
         for ent in ents:
             ner.add_label(ent)
-
+        print(ner.move_names)
         nlp.to_disk(model_path)
 
         logger.info("Agregados exitosamente las entidades al {model_path}...")
@@ -177,9 +183,8 @@ class SpacyConverterTrainer:
         :ents: lista de entidades a entrenar
         """
 
-        training_data = removeEntitiesNotInList(
-            convert_dataturks_to_spacy(path_data_training), ents
-        )
+        training_data = convert_dataturks_to_spacy(path_data_training, ents)
+
         nlp = spacy.load(model_path)
 
         # get names of other pipes to disable them during training
@@ -191,7 +196,6 @@ class SpacyConverterTrainer:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
 
-        print(ner.move_names)
         # only train NER
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # show warnings for misaligned entity spans once
@@ -234,10 +238,14 @@ class SpacyConverterTrainer:
         :param model_path:ruta del modelo
         :param ents: Lista de las entidades a anonimizar.
         """
+        begin_time = datetime.datetime.now()
         onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
+        self.add_new_entity_to_model(ents, model_path)
         for file in onlyfiles:
             print("Se esta procesando {}".format(file))
             self.train_model(path_folder + file, n_iter, model_path, ents)
+        diff = datetime.datetime.now() - begin_time
+        print("Tardo {} en procesar la info".format(diff))
 
 
 if __name__ == "__main__":

@@ -45,11 +45,11 @@ python train.py create_custom_spacy_model "es_core_news_sm" "./modelo2020"
 **Ejemplo**:
 
 ```bash
-python train.py train_model Batch\ 02.json 2 modelo2020 ["FECHA","PER","DIRECCIÓN","NUM_DNI","NUM_CUIT_CUIL","EDAD","NACIONALIDAD","NUM_TELEFÓNO","OCUPACIÓN/PROFESIÓN","PATENTE/DOMINIO","CORREO_ELECTRÓNICO","ARTÍCULO"]
+python train.py train_model Batch\ 02.json 2 modelo2020 [FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD,NUM_TELEFÓNO,OCUPACIÓN/PROFESIÓN,PATENTE/DOMINIO,CORREO_ELECTRÓNICO,ARTÍCULO]
 ```
 
 #### Entrenar una serie de batches que estan en una carpeta
 
 ```bash
- python train.py all_files_in_folder Json\ 4/  2  modelo2020 ["FECHA","PER","DIRECCIÓN","NUM_DNI","NUM_CUIT_CUIL","EDAD","NACIONALIDAD"]
+ python train.py all_files_in_folder Json\ 4/  2  modelo2020 [FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD]
 ```
