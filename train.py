@@ -208,14 +208,22 @@ class SpacyConverterTrainer:
             # show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             nlp.begin_training()
+            # print(training_data)
             for itn in range(n_iter):
                 random.shuffle(training_data)  # Se randomiza
                 losses = {}
                 # Crea mini paquetes
                 batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
                 #
+
                 for batch in batches:
                     texts, annotations = zip(*batch)
+                    doc = nlp(texts[0])
+                    entities = annotations[0]
+                    print(annotations)
+
+                    # tags = biluo_tags_from_offsets(doc, entities)
+                    # print(tags)
                     nlp.update(
                         texts,  # batch of texts
                         annotations,  # batch of annotations
