@@ -45,7 +45,6 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
         with open(dataturks_JSON_FilePath, "r") as f:
             lines = f.readlines()
             for line in lines:
-                line = lines[0]
                 data = json.loads(line)
                 text = data["content"]
                 entities = []
