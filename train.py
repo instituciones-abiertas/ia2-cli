@@ -10,6 +10,8 @@ import re
 import spacy
 from spacy.util import minibatch, compounding, filter_spans
 from spacy.gold import biluo_tags_from_offsets
+from spacy.scorer import Scorer
+from spacy.gold import GoldParse
 from os import listdir
 from os.path import isfile, join
 
@@ -78,23 +80,15 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
                         if start not in seen_tokens and end - 1 not in seen_tokens:
                             count_common = count_common + 1
                             seen_tokens.update(range(start, end))
-
+                            if isinstance(labels, list):
+                                labels = labels[0]
+                            entities.append((start, end + 1, labels))
                         else:
                             count_overlaped = count_overlaped + 1
                             print(
                                 "{} {} {} esta overlapeada".format(start, end, labels)
                             )
-
-                        if not isinstance(labels, list):
-                            labels = [labels]
-
-                        for label in labels:
-                            # dataturks indices are both inclusive [start, end] but spacy is not [start, end)
-                            entities.append((start, end + 1, label))
-                        print("Voy agregar estas entidades {}".format(entities))
-                        training_data.append((text, {"entities": entities}))
-                else:
-                    print("Esta vacia las entidades de {}".format(line))
+                training_data.append((text, {"entities": entities}))
 
         print("Entidades normales : {}".format(count_common))
         print("Entidades overlopeadas : {}".format(count_overlaped))
@@ -179,7 +173,13 @@ class SpacyConverterTrainer:
         logger.info("Informacion convertida exitosamente")
 
     def train_model(
-        self, path_data_training: str, n_iter: int, model_path: str, ents: list
+        self,
+        path_data_training: str,
+        n_iter: int,
+        model_path: str,
+        ents: list,
+        path_best_model: str,
+        best_losses: float,
     ):
         """
         Dado una data en formato dataturks, la transforma para formato spacy.
@@ -188,6 +188,7 @@ class SpacyConverterTrainer:
         :param model_path: path del modelo a  utilizar
         :ents: lista de entidades a entrenar
         """
+        best = best_losses
 
         training_data = convert_dataturks_to_spacy(path_data_training, ents)
 
@@ -209,6 +210,7 @@ class SpacyConverterTrainer:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             nlp.begin_training()
             # print(training_data)
+
             for itn in range(n_iter):
                 random.shuffle(training_data)  # Se randomiza
                 losses = {}
@@ -218,21 +220,44 @@ class SpacyConverterTrainer:
 
                 for batch in batches:
                     texts, annotations = zip(*batch)
-                    doc = nlp(texts[0])
-                    entities = annotations[0]
-                    print(annotations)
-
+                    # Codigo para probar bilout_tags
+                    # doc = nlp(texts[0])
+                    # entities = annotations[0]
                     # tags = biluo_tags_from_offsets(doc, entities)
                     # print(tags)
+                    print(
+                        "Se estan cargando las siguientes entidades para entrenar: {}".format(
+                            annotations
+                        )
+                    )
+
                     nlp.update(
                         texts,  # batch of texts
                         annotations,  # batch of annotations
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
-                print("Losses", losses)
-        # save model to output directory
-        nlp.to_disk(model_path)
+                print(losses)
+                try:
+                    numero_losses = losses.get("ner")
+                    print(type(numero_losses))
+                    print(type(best))
+                    if numero_losses < best and numero_losses > 0:
+                        best = numero_losses
+                        nlp.to_disk(path_best_model)
+                        print("Guarde el modelo con este losses {}".format(best))
+
+                except Exception:
+                    print("Batch sin entidades entrenadas")
+
+            # save model to output directory
+            nlp.to_disk(model_path)
+            print(
+                "El mejor losses fue {} y esta guardado el modelo en {}".format(
+                    best, path_best_model
+                )
+            )
+            return best
 
     def get_entities(self, model_path: str, text: str):
         """
@@ -242,10 +267,28 @@ class SpacyConverterTrainer:
         """
         nlp = spacy.load(model_path, disable=["tagger", "parser"])
         doc = nlp(text)
-        print(doc.ents)
+        spacy.displacy.serve(doc, style="ent", page=True, port=5030)
+
+    def scorer_model(self, model_path: str, text: str, annotations: list):
+        scorer = Scorer()
+        print(scorer.scores)
+        nlp = spacy.load(model_path)
+        try:
+            doc_gold_text = nlp.make_doc(text)
+            gold = GoldParse(doc_gold_text, entities=annotations)
+            pred_value = nlp(text)
+            scorer.score(pred_value, gold)
+            print(scorer.scores)
+        except Exception as e:
+            print(e)
 
     def all_files_in_folder(
-        self, path_folder: str, n_iter: int, model_path: str, ents: list
+        self,
+        path_folder: str,
+        n_iter: int,
+        model_path: str,
+        ents: list,
+        path_best_model: str,
     ):
         """
         Entrenar un modelo con todos los archivos en la carpeta actual.
@@ -255,10 +298,19 @@ class SpacyConverterTrainer:
         """
         begin_time = datetime.datetime.now()
         onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
-        self.add_new_entity_to_model(ents, model_path)
+        # self.add_new_entity_to_model(ents, model_path)
+        best_losses = 100.0
         for file in onlyfiles:
             print("Se esta procesando {}".format(file))
-            self.train_model(path_folder + file, n_iter, model_path, ents)
+            best_losses = self.train_model(
+                path_folder + file,
+                n_iter,
+                model_path,
+                ents,
+                path_best_model,
+                best_losses,
+            )
+            print(best_losses)
         diff = datetime.datetime.now() - begin_time
         print("Tardo {} en procesar la info".format(diff))
 
