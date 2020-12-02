@@ -102,7 +102,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
 
 class SpacyConverterTrainer:
     """
-    Convertidor de formato Dataturks a Spacy y eliminador de repetidos .
+    Convertidor de formato Dataturks a Spacy y eliminador de repetidos.
 
     Metodos disponibles:
     create_blank_model(path_save_model: str)--> Crea un modelo en blanco
@@ -115,7 +115,7 @@ class SpacyConverterTrainer:
 
     def create_blank_model(self, path_save_model: str):
         """
-        Crea un modelo en blanco .
+        Crea un modelo en blanco.
         :param path_save_model: path donde se guardar el modelo
 
         """
@@ -125,7 +125,7 @@ class SpacyConverterTrainer:
 
     def create_custom_spacy_model(self, spacy_model: str, path_save_model: str):
         """
-        Crea un modelo en base al modelo pasado por parametro .
+        Crea un modelo en base al modelo pasado por parametro.
         :param spacy_model: modelo de spacy a partir de base
         :param path_save_model: path donde se guardar el modelo
 
@@ -155,22 +155,32 @@ class SpacyConverterTrainer:
 
         logger.info("Agregados exitosamente las entidades al {model_path}...")
 
-    def convert_dataturks_to_spacy(self, convert_data_path: str, output_path: str):
+    def convert_dataturks_to_spacy(
+        self,
+        input_file_path: str,
+        output_file_path: str,
+        entities: list
+    ):
         """
-        Dado una data en formato dataturks, la transforma para formato spacy.
-        :param convert_data_path: path del output de dataturks
-        :param output_path: path del archivo resultante
+        Dada la ruta de un documento en formato dataturks, una ruta donde
+        almacenar la salida del programa y una lista de entidades a procesar, se
+        transforma el documento dado a formato Spacy y se almacena en la ruta
+        de salida.
 
+        :param input_file_path: ruta del documento en formato dataturks
+        :param output_file_path: ruta del directorio donde se almacenará la
+        conversión
+        :param entities: lista de entidades a procesar en el documento dado
         """
-        logger.info(f"Loading convert data from {convert_data_path} ...")
+        logger.info(f"Loading convert data from {input_file_path} ...")
         training_data = []
-        log = convert_dataturks_to_spacy(convert_data_path)
+        log = convert_dataturks_to_spacy(input_file_path, entities)
         print(log)
-        with open(output_path, "a+") as f:
-            training_data.append(convert_dataturks_to_spacy(convert_data_path))
-        with open(output_path, "wb") as output:
+        with open(output_file_path, "a+") as f:
+            training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
+        with open(output_file_path, "wb") as output:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
-        logger.info("Informacion convertida exitosamente")
+        logger.info("Información convertida exitosamente")
 
     def train_model(
         self,
@@ -225,11 +235,11 @@ class SpacyConverterTrainer:
                     # entities = annotations[0]
                     # tags = biluo_tags_from_offsets(doc, entities)
                     # print(tags)
-                    print(
-                        "Se estan cargando las siguientes entidades para entrenar: {}".format(
-                            annotations
-                        )
-                    )
+                    # print(
+                    #     "Se estan cargando las siguientes entidades para entrenar: {}".format(
+                    #         annotations
+                    #     )
+                    # )
 
                     nlp.update(
                         texts,  # batch of texts
@@ -240,23 +250,24 @@ class SpacyConverterTrainer:
                 print(losses)
                 try:
                     numero_losses = losses.get("ner")
-                    print(type(numero_losses))
-                    print(type(best))
+                    # print(type(numero_losses))
+                    # print(type(best))
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
-                        print("Guarde el modelo con este losses {}".format(best))
+                        print("💾 >>> Saving model with losses: [{}]".format(best))
 
                 except Exception:
                     print("Batch sin entidades entrenadas")
 
             # save model to output directory
             nlp.to_disk(model_path)
-            print(
-                "El mejor losses fue {} y esta guardado el modelo en {}".format(
-                    best, path_best_model
-                )
-            )
+            # A este punto no se puede asegurar que alguna vez se guardó el best model, no sabemos si obtuvimos o no un mejor losses.
+            # print(
+            #     "El mejor losses fue {} y esta guardado el modelo en {}".format(
+            #         best, path_best_model
+            #     )
+            # )
             return best
 
     def get_entities(self, model_path: str, text: str):
@@ -288,18 +299,21 @@ class SpacyConverterTrainer:
         n_iter: int,
         model_path: str,
         ents: list,
-        path_best_model: str,
+        best_model_path: str,
+        max_losses: float
     ):
         """
-        Entrenar un modelo con todos los archivos en la carpeta actual.
-        :n_iter:numero de iteraciones
-        :param model_path:ruta del modelo
-        :param ents: Lista de las entidades a anonimizar.
+        Entrenar un modelo con todos los archivos en la carpeta actual y almacena el mejor modelo obtenido.
+        :param n_iter: número de iteraciones entre actualzaciones de modelo
+        :param model_path: ruta del modelo a utilizar
+        :param ents: lista de entidades a anonimizar
+        :param best_model_path: directorio donde se almacenará el mejor modelo
+        :param max_losses: cantidad máxima de losses permitidos para almacenar un mejor modelo
         """
         begin_time = datetime.datetime.now()
         onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
         # self.add_new_entity_to_model(ents, model_path)
-        best_losses = 100.0
+        best_losses = max_losses
         for file in onlyfiles:
             print("Se esta procesando {}".format(file))
             best_losses = self.train_model(
@@ -307,13 +321,12 @@ class SpacyConverterTrainer:
                 n_iter,
                 model_path,
                 ents,
-                path_best_model,
+                best_model_path,
                 best_losses,
             )
             print(best_losses)
         diff = datetime.datetime.now() - begin_time
-        print("Tardo {} en procesar la info".format(diff))
-
+        print("Tardó {} en procesar {} documentos.".format(diff, len(onlyfiles)))
 
 if __name__ == "__main__":
     fire.Fire(SpacyConverterTrainer)
