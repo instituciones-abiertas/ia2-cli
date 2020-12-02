@@ -295,32 +295,43 @@ class SpacyConverterTrainer:
 
     def all_files_in_folder(
         self,
-        path_folder: str,
+        training_files_path: str,
         n_iter: int,
         model_path: str,
-        ents: list,
+        entities: list,
         best_model_path: str,
         max_losses: float
     ):
         """
-        Entrenar un modelo con todos los archivos en la carpeta actual y almacena el mejor modelo obtenido.
-        :param n_iter: número de iteraciones entre actualzaciones de modelo
+        Dada la ruta de un directorio de documentos dataturks de entrenamiento,
+        un número de iteraciones, la ruta de un modelo, una lista de entidades a
+        procesar, una ruta donde almacenar el mejor modelo obtenido y un número
+        que represente el mayor puntaje de pérdidas aceptado, se entrena el
+        modelo dado con los documentos de entrenamiento definidos en
+        `training_files_path` con `n_iter` iteraciones. Cada vez que se analiza
+        un archivo de entrenamiento se evalúa y compara la cantidad de pérdidas
+        obtenidas con las máximas soportadas `max_losses` para almacenar un
+        modelo aceptable en `best_model_path`.
+
+        :param training_files_path: ruta del directorio de los archivos de
+        entrenamiento.
+        :param n_iter: número de iteraciones entre actualizaciones de modelo
         :param model_path: ruta del modelo a utilizar
-        :param ents: lista de entidades a anonimizar
+        :param entities: lista de entidades a anonimizar
         :param best_model_path: directorio donde se almacenará el mejor modelo
         :param max_losses: cantidad máxima de losses permitidos para almacenar un mejor modelo
         """
         begin_time = datetime.datetime.now()
-        onlyfiles = [f for f in listdir(path_folder) if isfile(join(path_folder, f))]
-        # self.add_new_entity_to_model(ents, model_path)
+        onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
+        # self.add_new_entity_to_model(entities, model_path)
         best_losses = max_losses
         for file in onlyfiles:
             print("Se esta procesando {}".format(file))
             best_losses = self.train_model(
-                path_folder + file,
+                training_files_path + file,
                 n_iter,
                 model_path,
-                ents,
+                entities,
                 best_model_path,
                 best_losses,
             )
