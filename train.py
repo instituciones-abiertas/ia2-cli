@@ -16,10 +16,15 @@ import srsly
 from os import listdir
 from os.path import isfile, join
 
-logging.basicConfig(filename='test.log',level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('logger')
 
+general_logger_handler = logging.FileHandler('logs/general.output.log')
+general_logger_handler.setLevel(logging.INFO)
+logger.addHandler(general_logger_handler)
 
+conversion_logger_handler = logging.FileHandler('logs/error.output.log')
+conversion_logger_handler.setLevel(logging.ERROR)
+logger.addHandler(conversion_logger_handler)
 
 DROPOUT_RATE = 0.2  ## Configuracion del set de dropout del entrenamiento
 
@@ -180,17 +185,35 @@ class SpacyConverterTrainer:
     def convert_dataturks_to_training_cli(
         self, input_file_path: str, output_file_path: str, entities: list
     ):
-
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
         TRAIN_DATA = convert_dataturks_to_spacy(input_file_path, entities)
 
+        conflicted_entities = []
         docs = []
+        batch_element = 0
         for text, annot in TRAIN_DATA:
             doc = nlp(text)
-            doc.ents = [
-                doc.char_span(start_idx, end_idx, label=label)
-                for start_idx, end_idx, label in annot["entities"]
-            ]
+
+            new_ents = []
+            for start_idx, end_idx, label in annot["entities"]:
+                span = doc.char_span(start_idx, end_idx, label=label)
+
+                if span is None:
+                    conflicted_entity = {
+                        "file": input_file_path,
+                        "element": batch_element,
+                        "label": label,
+                        "start_index": start_idx,
+                        "end_index": end_idx,
+                        "matches_text": text[start_idx:end_idx]
+                    }
+                    logger.critical("[Conflicted entity] Could not save an entity because it does not match a entity in the given document.")
+                    logger.critical(conflicted_entity)
+                else:
+                    new_ents.append(span)
+
+            batch_element = batch_element + 1
+            doc.ents = new_ents
             docs.append(doc)
 
         srsly.write_json(output_file_path, [docs_to_json(docs)])
