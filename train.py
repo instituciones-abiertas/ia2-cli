@@ -11,12 +11,14 @@ import spacy
 from spacy.util import minibatch, compounding, filter_spans
 from spacy.gold import biluo_tags_from_offsets
 from spacy.scorer import Scorer
-from spacy.gold import GoldParse
+from spacy.gold import GoldParse, docs_to_json
+import srsly
 from os import listdir
 from os.path import isfile, join
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename='test.log',level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 
 DROPOUT_RATE = 0.2  ## Configuracion del set de dropout del entrenamiento
@@ -47,6 +49,8 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
 
         with open(dataturks_JSON_FilePath, "r") as f:
             lines = f.readlines()
+            count_total = 0
+            count_overlaped = 0
             for line in lines:
                 data = json.loads(line)
                 text = data["content"]
@@ -70,28 +74,24 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
                     )
 
                     seen_tokens = set()
-                    count_common = 0
-                    count_overlaped = 0
                     for annotation in annotations:
 
                         start = annotation[0]
                         end = annotation[1]
                         labels = annotation[2]
                         if start not in seen_tokens and end - 1 not in seen_tokens:
-                            count_common = count_common + 1
                             seen_tokens.update(range(start, end))
                             if isinstance(labels, list):
                                 labels = labels[0]
                             entities.append((start, end + 1, labels))
+                            count_total = count_total + 1
                         else:
                             count_overlaped = count_overlaped + 1
-                            print(
-                                "{} {} {} is overlapped".format(start, end, labels)
-                            )
+                            logger.info("{} {} {} is overlapped".format(start, end, labels))
                 training_data.append((text, {"entities": entities}))
 
-        print("Entities: {}".format(count_common))
-        print("Overlapped entities : {}".format(count_overlaped))
+        logger.info("Entities: {}".format(count_total))
+        logger.info("Overlapped entities : {}".format(count_overlaped))
         return training_data
     except Exception as e:
         logging.exception(
@@ -155,10 +155,7 @@ class SpacyConverterTrainer:
         logger.info("Agregados exitosamente las entidades al {model_path}...")
 
     def convert_dataturks_to_spacy(
-        self,
-        input_file_path: str,
-        output_file_path: str,
-        entities: list
+        self, input_file_path: str, output_file_path: str, entities: list
     ):
         """
         Dada la ruta de un documento en formato dataturks, una ruta donde
@@ -171,15 +168,32 @@ class SpacyConverterTrainer:
         conversión
         :param entities: lista de entidades a procesar en el documento dado
         """
-        logger.info(f"Loading convert data from {input_file_path} ...")
+        #logger.info(f"Loading convert data from {input_file_path} ...")
         training_data = []
         log = convert_dataturks_to_spacy(input_file_path, entities)
-        print(log)
         with open(output_file_path, "a+") as f:
             training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
         with open(output_file_path, "wb") as output:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
         logger.info("Información convertida exitosamente")
+
+    def convert_dataturks_to_training_cli(
+        self, input_file_path: str, output_file_path: str, entities: list
+    ):
+
+        nlp = spacy.load("es_core_news_lg", disable=["ner"])
+        TRAIN_DATA = convert_dataturks_to_spacy(input_file_path, entities)
+
+        docs = []
+        for text, annot in TRAIN_DATA:
+            doc = nlp(text)
+            doc.ents = [
+                doc.char_span(start_idx, end_idx, label=label)
+                for start_idx, end_idx, label in annot["entities"]
+            ]
+            docs.append(doc)
+
+        srsly.write_json(output_file_path, [docs_to_json(docs)])
 
     def train_model(
         self,
@@ -249,18 +263,16 @@ class SpacyConverterTrainer:
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
-                print("⬇️ Losses rate: [{}]".format(losses))
+                logger.info("⬇️ Losses rate: [{}]".format(losses))
                 try:
                     numero_losses = losses.get("ner")
-                    # print(type(numero_losses))
-                    # print(type(best))
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
-                        print("💾 >>> Saving model with losses: [{}]".format(best))
+                        logger.info("💾 >>> Saving model with losses: [{}]".format(best))
 
                 except Exception:
-                    print("Batch sin entidades entrenadas")
+                    logger.info("Batch sin entidades entrenadas")
 
             # save model to output directory
             nlp.to_disk(model_path)
@@ -301,7 +313,7 @@ class SpacyConverterTrainer:
         model_path: str,
         entities: list,
         best_model_path: str,
-        max_losses: float
+        max_losses: float,
     ):
         """
         Dada la ruta de un directorio de documentos dataturks de entrenamiento,
@@ -323,11 +335,15 @@ class SpacyConverterTrainer:
         :param max_losses: cantidad máxima de losses permitidos para almacenar un mejor modelo
         """
         begin_time = datetime.datetime.now()
-        onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
+        onlyfiles = [
+            f
+            for f in listdir(training_files_path)
+            if isfile(join(training_files_path, f))
+        ]
         # self.add_new_entity_to_model(entities, model_path)
         best_losses = max_losses
         for file in onlyfiles:
-            print("Se esta procesando {}".format(file))
+            logger.info("Se esta procesando {}".format(file))
             best_losses = self.train_model(
                 training_files_path + file,
                 n_iter,
@@ -336,9 +352,10 @@ class SpacyConverterTrainer:
                 best_model_path,
                 best_losses,
             )
-            print(best_losses)
+            logger.info("Se guardo un modelo con {}".format(best_losses))
         diff = datetime.datetime.now() - begin_time
-        print("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
+        logger.info("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
+
 
 if __name__ == "__main__":
     fire.Fire(SpacyConverterTrainer)

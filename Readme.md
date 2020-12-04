@@ -32,8 +32,8 @@ python -m spacy download es_core_news_lg
 
 #### Crear un modelo en español vacío
 
-+ `model_name`: nombre del modelo a utilizar como base del nuevo
-+ `output_path`: directorio donde se almacenará el nuevo modelo
+- `model_name`: nombre del modelo a utilizar como base del nuevo
+- `output_path`: directorio donde se almacenará el nuevo modelo
 
 ```bash
 python train.py create_custom_spacy_model <model_name> <output_path>
@@ -49,12 +49,12 @@ python train.py create_custom_spacy_model \
 
 #### Entrenar con un batch
 
-+ `batch_path`: path de un archivo (`.json`) de entrenamiento.
-+ `iter_n`: número de iteraciones por batch.
-+ `model_path`: directorio del modelo custom a utilizar
-+ `training_entities`: lista de entidades a entrenar
-+ `output_path`: directorio donde se almacenará el modelo más óptimo
-+ `max_losses`: (número flotante) Máximo valor de Losses soportado
+- `batch_path`: path de un archivo (`.json`) de entrenamiento.
+- `iter_n`: número de iteraciones por batch.
+- `model_path`: directorio del modelo custom a utilizar
+- `training_entities`: lista de entidades a entrenar
+- `output_path`: directorio donde se almacenará el modelo más óptimo
+- `max_losses`: (número flotante) Máximo valor de Losses soportado
 
 ```bash
 python train.py train_model \
@@ -80,12 +80,12 @@ python train.py train_model \
 
 #### Entrenar una serie de batches que estan en una carpeta
 
-+ `batches_path`: directorio de archivos (`.json`) de entrenamiento.
-+ `iter_n`: número de iteraciones por batch.
-+ `model_path`: directorio del modelo custom a utilizar
-+ `training_entities`: lista de entidades a entrenar
-+ `output_path`: directorio donde se almacenará el modelo más óptimo
-+ `max_losses`: (número flotante) Máximo valor de Losses soportado
+- `batches_path`: directorio de archivos (`.json`) de entrenamiento.
+- `iter_n`: número de iteraciones por batch.
+- `model_path`: directorio del modelo custom a utilizar
+- `training_entities`: lista de entidades a entrenar
+- `output_path`: directorio donde se almacenará el modelo más óptimo
+- `max_losses`: (número flotante) Máximo valor de Losses soportado
 
 ```bash
 python train.py train_model \
@@ -113,8 +113,8 @@ python train.py all_files_in_folder \
 
 El siguiente comando permite visualizar resultados de un entrenamiento utilizando [displayCy](https://spacy.io/api/top-level#displacy). Disponibiliza un servidor en el puerto `5030`.
 
-+ `model_path`: directorio del modelo a utilizar para las pruebas
-+ `test_text`: string que represente un texto de prueba
+- `model_path`: directorio del modelo a utilizar para las pruebas
+- `test_text`: string que represente un texto de prueba
 
 ```bash
 python train.py get_entities <model_path> <test_text>
@@ -132,9 +132,9 @@ python train.py get_entities \
 
 #### Utilizar Scorer para probar el modelo y obtener información sobre los resultados de pruebas
 
-+ `model_path`: directorio del modelo a utilizar para las pruebas
-+ `test_text`: string que represente un texto de prueba
-+ `annotations`: lista de ocurrencias de etiquetas `[(`)]`
+- `model_path`: directorio del modelo a utilizar para las pruebas
+- `test_text`: string que represente un texto de prueba
+- `annotations`: lista de ocurrencias de etiquetas `[(`)]`
 
 ```bash
 python train.py scorer_model <model_path> <test_text> <annotations>
@@ -157,4 +157,22 @@ python train.py all_files_in_folder \
   2 \
   models/base/2020-12-01 \
   [FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD] > logs_file_name.txt
+```
+
+#### Convertir un Batch Dataturks a JSON Spacy para usar CLI
+
+```bash
+convert_dataturks_to_training_cli
+path_batch_a_convertir \
+path_json_resultante \
+lista_entidades_a_presevar \
+```
+
+##### Ejemplo
+
+```bash
+convert_dataturks_to_training_cli
+Batch_05.json \
+batch_05_spacy.json \
+"PER, LOC" \
 ```
