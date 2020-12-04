@@ -1,0 +1,12 @@
+# Text Editors
+.vscode
+
+# Training and Output data
+data
+output
+
+# Spacy Models
+models
+
+# Misc
+__pycache__
