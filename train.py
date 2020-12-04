@@ -35,7 +35,7 @@ def removeEntitiesNotInList(spacyfile, entityList):
                 # print("Se conservo la entidad {}".format(ent[2]))
                 entities.append(ent)
             else:
-                print("Se descarto la entidad {}".format(ent[2]))
+                print("Discards entity {}".format(ent[2]))
         newTrainingData.append((hit[0], {"entities": entities}))
     return newTrainingData
 
@@ -86,12 +86,12 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
                         else:
                             count_overlaped = count_overlaped + 1
                             print(
-                                "{} {} {} esta overlapeada".format(start, end, labels)
+                                "{} {} {} is overlapped".format(start, end, labels)
                             )
                 training_data.append((text, {"entities": entities}))
 
-        print("Entidades normales : {}".format(count_common))
-        print("Entidades overlopeadas : {}".format(count_overlaped))
+        print("Entities: {}".format(count_common))
+        print("Overlapped entities : {}".format(count_overlaped))
         return training_data
     except Exception as e:
         logging.exception(
@@ -143,8 +143,7 @@ class SpacyConverterTrainer:
         """
 
         nlp = spacy.load(model_path)
-        ner = nlp.pipe_names
-        if not ner:
+        if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
             nlp.add_pipe(component)
         ner = nlp.get_pipe("ner")
@@ -207,6 +206,9 @@ class SpacyConverterTrainer:
         # get names of other pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
+        if "ner" not in nlp.pipe_names:
+            component = nlp.create_pipe("ner")
+            nlp.add_pipe(component)
         ner = nlp.get_pipe("ner")
 
         for _, annotations in training_data:
@@ -247,7 +249,7 @@ class SpacyConverterTrainer:
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
-                print(losses)
+                print("⬇️ Losses rate: [{}]".format(losses))
                 try:
                     numero_losses = losses.get("ner")
                     # print(type(numero_losses))
@@ -280,16 +282,15 @@ class SpacyConverterTrainer:
         doc = nlp(text)
         spacy.displacy.serve(doc, style="ent", page=True, port=5030)
 
-    def scorer_model(self, model_path: str, text: str, annotations: list):
+    def evaluate(self, model_path: str, text: str, entity_occurences: list):
         scorer = Scorer()
-        print(scorer.scores)
         nlp = spacy.load(model_path)
         try:
             doc_gold_text = nlp.make_doc(text)
-            gold = GoldParse(doc_gold_text, entities=annotations)
+            gold = GoldParse(doc_gold_text, entities=entity_occurences)
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
-            print(scorer.scores)
+            return scorer.scores
         except Exception as e:
             print(e)
 
@@ -337,7 +338,7 @@ class SpacyConverterTrainer:
             )
             print(best_losses)
         diff = datetime.datetime.now() - begin_time
-        print("Tardó {} en procesar {} documentos.".format(diff, len(onlyfiles)))
+        print("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
 
 if __name__ == "__main__":
     fire.Fire(SpacyConverterTrainer)
