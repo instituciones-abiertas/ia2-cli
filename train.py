@@ -27,12 +27,12 @@ logger.addHandler(logger_fh)
 # Sets a global default value for DROPOUT_RATE
 DROPOUT_RATE = 0.2
 
-def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
+def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
         training_data = []
         lines = []
 
-        with open(dataturks_JSON_FilePath, "r") as f:
+        with open(dataturks_JSON_file_path, "r") as f:
             lines = f.readlines()
             count_total = 0
             count_overlaped = 0
@@ -45,7 +45,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
                     for annotation in data["annotation"]:
                         point = annotation["points"][0]
                         label = annotation["label"]
-                        if label[0] in entityList:
+                        if label[0] in entity_list:
                             annotations.append(
                                 (
                                     point["start"],
@@ -80,7 +80,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
         return training_data
     except Exception as e:
         logging.exception(
-            "Unable to process " + dataturks_JSON_FilePath + "\n" + "error = " + str(e)
+            "Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e)
         )
         return None
 
