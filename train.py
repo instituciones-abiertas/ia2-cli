@@ -162,11 +162,24 @@ class SpacyConverterTrainer:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
         logger.info("Información convertida exitosamente")
 
-    def convert_dataturks_to_training_cli(
-        self, input_file_path: str, output_file_path: str, entities: list
+    def convert_dataturks_to_training_cli(self,
+        input_files_path: str,
+        entities: list,
+        output_file_path: str
     ):
+        """
+        Given an input directory and a list of entities, converts every .json
+        file from the directory into a single .json recognisable by Spacy and
+        writes it out to the given output directory.
+
+        :param input_files_path: Directory pointing to dataturks .json files to
+        be converted
+        :param entities: A list of entities, separated by comma, to be
+        considered during annotations extraction from each dadaturks batch.
+        :param output_file_path: The path and name of the output file.
+        """
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
-        TRAIN_DATA = convert_dataturks_to_spacy(input_file_path, entities)
+        TRAIN_DATA = convert_dataturks_to_spacy(input_files_path, entities)
 
         docs = []
         batch_element = 0
@@ -179,7 +192,7 @@ class SpacyConverterTrainer:
 
                 if span is None:
                     conflicted_entity = {
-                        "file": input_file_path,
+                        "file": input_files_path,
                         "element": batch_element,
                         "label": label,
                         "start_index": start_idx,
