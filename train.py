@@ -16,36 +16,16 @@ import srsly
 from os import listdir
 from os.path import isfile, join
 
-logger = logging.getLogger('logger')
+logger = logging.getLogger('Spacy cli util')
+logger.setLevel(logging.DEBUG)
+logger_fh = logging.FileHandler('logs/debug.log')
+logger_fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s')
+logger_fh.setFormatter(formatter)
+logger.addHandler(logger_fh)
 
-general_logger_handler = logging.FileHandler('logs/general.output.log')
-general_logger_handler.setLevel(logging.INFO)
-logger.addHandler(general_logger_handler)
-
-conversion_logger_handler = logging.FileHandler('logs/error.output.log')
-conversion_logger_handler.setLevel(logging.ERROR)
-logger.addHandler(conversion_logger_handler)
-
-DROPOUT_RATE = 0.2  ## Configuracion del set de dropout del entrenamiento
-
-
-def removeEntitiesNotInList(spacyfile, entityList):
-    # Esta funcion remueve de una training_data preparada para spacy ,todas las entidades que estan en la lista
-    file = spacyfile
-    newTrainingData = []
-
-    for hit in file:
-        entities = []
-        data = hit[1]["entities"]
-        for ent in data:
-            if ent[2] in entityList:
-                # print("Se conservo la entidad {}".format(ent[2]))
-                entities.append(ent)
-            else:
-                print("Discards entity {}".format(ent[2]))
-        newTrainingData.append((hit[0], {"entities": entities}))
-    return newTrainingData
-
+# Sets a global default value for DROPOUT_RATE
+DROPOUT_RATE = 0.2
 
 def convert_dataturks_to_spacy(dataturks_JSON_FilePath, entityList):
     try:
@@ -188,7 +168,6 @@ class SpacyConverterTrainer:
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
         TRAIN_DATA = convert_dataturks_to_spacy(input_file_path, entities)
 
-        conflicted_entities = []
         docs = []
         batch_element = 0
         for text, annot in TRAIN_DATA:
@@ -207,8 +186,7 @@ class SpacyConverterTrainer:
                         "end_index": end_idx,
                         "matches_text": text[start_idx:end_idx]
                     }
-                    logger.critical("[Conflicted entity] Could not save an entity because it does not match a entity in the given document.")
-                    logger.critical(conflicted_entity)
+                    logger.critical(f"[Conflicted entity] Could not save an entity because it does not match an entity in the given document. Output: {conflicted_entity}")
                 else:
                     new_ents.append(span)
 
