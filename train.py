@@ -153,7 +153,7 @@ class SpacyConverterTrainer:
         conversión
         :param entities: lista de entidades a procesar en el documento dado
         """
-        #logger.info(f"Loading convert data from {input_file_path} ...")
+        logger.info(f"Loading convert data from {input_file_path} ...")
         training_data = []
         log = convert_dataturks_to_spacy(input_file_path, entities)
         with open(output_file_path, "a+") as f:
@@ -218,7 +218,7 @@ class SpacyConverterTrainer:
 
         nlp = spacy.load(model_path)
 
-        # get names of other pipes to disable them during training
+        # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
         if "ner" not in nlp.pipe_names:
@@ -236,31 +236,19 @@ class SpacyConverterTrainer:
             # show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             nlp.begin_training()
-            # print(training_data)
 
             for itn in range(n_iter):
                 random.shuffle(training_data)  # Se randomiza
                 losses = {}
-                # Crea mini paquetes
+                # Creates mini batches
                 batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
-                #
 
                 for batch in batches:
                     texts, annotations = zip(*batch)
-                    # Codigo para probar bilout_tags
-                    # doc = nlp(texts[0])
-                    # entities = annotations[0]
-                    # tags = biluo_tags_from_offsets(doc, entities)
-                    # print(tags)
-                    # print(
-                    #     "Se estan cargando las siguientes entidades para entrenar: {}".format(
-                    #         annotations
-                    #     )
-                    # )
 
                     nlp.update(
-                        texts,  # batch of texts
-                        annotations,  # batch of annotations
+                        texts, # batch of raw texts
+                        annotations, # batch of annotations
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
@@ -275,14 +263,8 @@ class SpacyConverterTrainer:
                 except Exception:
                     logger.info("Batch sin entidades entrenadas")
 
-            # save model to output directory
+            # writes model to output directory
             nlp.to_disk(model_path)
-            # A este punto no se puede asegurar que alguna vez se guardó el best model, no sabemos si obtuvimos o no un mejor losses.
-            # print(
-            #     "El mejor losses fue {} y esta guardado el modelo en {}".format(
-            #         best, path_best_model
-            #     )
-            # )
             return best
 
     def get_entities(self, model_path: str, text: str):
