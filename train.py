@@ -72,11 +72,11 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
                             count_total = count_total + 1
                         else:
                             count_overlaped = count_overlaped + 1
-                            logger.info("{} {} {} is overlapped".format(start, end, labels))
+                            # logger.info("{} {} {} is overlapped".format(start, end, labels))
                 training_data.append((text, {"entities": entities}))
 
-        logger.info("Entities: {}".format(count_total))
-        logger.info("Overlapped entities : {}".format(count_overlaped))
+        # logger.info("Entities: {}".format(count_total))
+        # logger.info("Overlapped entities : {}".format(count_overlaped))
         return training_data
     except Exception as e:
         logging.exception(
@@ -179,10 +179,29 @@ class SpacyConverterTrainer:
         :param output_file_path: The path and name of the output file.
         """
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
-        TRAIN_DATA = convert_dataturks_to_spacy(input_files_path, entities)
+
+        TRAIN_DATA = []
+        begin_time = datetime.datetime.now()
+        input_files = [
+            f
+            for f in listdir(input_files_path)
+            if isfile(join(input_files_path, f))
+        ]
+
+        for input_file in input_files:
+            logger.info("Extracting raw data and occurrences from file: \"{}\"...".format(input_file))
+            extracted_data = convert_dataturks_to_spacy(
+                f"{input_files_path}/{input_file}",
+                entities
+            )
+            TRAIN_DATA = TRAIN_DATA + extracted_data
+            logger.info("Finished extracting data from file \"{}\".".format(input_file))
+
+        diff = datetime.datetime.now() - begin_time
+        logger.info("Lasted {} to extract dataturks data from {} documents.".format(diff, len(input_files)))
+        logger.info("Converting {} Documents with Occurences extracted from {} files into Spacy supported format...".format(len(TRAIN_DATA), len(input_files)))
 
         docs = []
-        batch_element = 0
         for text, annot in TRAIN_DATA:
             doc = nlp(text)
 
@@ -192,22 +211,28 @@ class SpacyConverterTrainer:
 
                 if span is None:
                     conflicted_entity = {
-                        "file": input_files_path,
-                        "element": batch_element,
+                        "file_dir": input_files_path,
                         "label": label,
                         "start_index": start_idx,
                         "end_index": end_idx,
                         "matches_text": text[start_idx:end_idx]
                     }
-                    logger.critical(f"[Conflicted entity] Could not save an entity because it does not match an entity in the given document. Output: {conflicted_entity}")
+                    logger.critical(f"Conflicted entity: could not save an entity because it does not match an entity in the given document. Output: \"{conflicted_entity}\".")
                 else:
                     new_ents.append(span)
 
-            batch_element = batch_element + 1
             doc.ents = new_ents
             docs.append(doc)
 
-        srsly.write_json(output_file_path, [docs_to_json(docs)])
+        diff = datetime.datetime.now() - begin_time
+        logger.info("Finished Converting {} Spacy Documents into trainable data. Lasted: ".format(len(TRAIN_DATA), diff))
+
+        try:
+            logger.info("💾 Writing final output at \"{}\"...".format(output_file_path))
+            srsly.write_json(output_file_path, [docs_to_json(docs)])
+            logger.info("💾 Done.")
+        except Exception:
+            logging.exception("An error occured writing the output file at \"{}\".".format(output_file_path))
 
     def train_model(
         self,
