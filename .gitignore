@@ -10,3 +10,6 @@ models
 
 # Misc
 __pycache__
+
+# Logs
+logs
