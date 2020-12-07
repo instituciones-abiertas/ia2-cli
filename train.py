@@ -103,33 +103,41 @@ class SpacyUtils:
         iterations number and list of entities.
     """
 
-    def create_blank_model(self, path_save_model: str):
+    # =================================
+    # Create Models functions
+    # =================================
+
+    def create_blank_model(self, output_path: str):
         """
         Given an output path creates a blank model using the "es" language.
-        :param path_save_model: A string representing an output path.  
+        :param output_path: A string representing an output path.  
 
         """
         nlp = spacy.blank("es")
-        nlp.to_disk(path_save_model)
+        nlp.to_disk(output_path)
         logger.info("Succesfully created model at: \"{}...\"".format(
-            path_save_model
+            output_path
         ))
 
-    def create_custom_spacy_model(self, spacy_model: str, path_save_model: str):
+    def create_custom_spacy_model(self, spacy_model: str, output_path: str):
         """
         Given a Spacy model name and an output path, loads the model using the
         Spacy api and saves it at the given path.
 
         :param spacy_model: A string representing a Spacy model. E.g.:
         "es_core_news_lg".  
-        :param path_save_model: A string representing the output path where the
+        :param output_path: A string representing the output path where the
         model should be written.  
         """
         nlp = spacy.load(spacy_model)
-        nlp.to_disk(path_save_model)
+        nlp.to_disk(output_path)
         logger.info("Succesfully created model at: \"{}\".".format(
-            path_save_model
+            output_path
         ))
+
+    # =================================
+    # Update Models functions
+    # =================================
 
     def add_new_entity_to_model(self, ents: list, model_path: str):
         """
@@ -153,6 +161,10 @@ class SpacyUtils:
         logger.info("Succesfully added entities at model: \"{}\".".format(
             model_path
         ))
+
+    # =================================
+    # Data Conversion functions
+    # =================================
 
     def convert_dataturks_to_spacy(
         self, input_file_path: str, output_file_path: str, entities: list
@@ -251,6 +263,10 @@ class SpacyUtils:
         except Exception:
             logging.exception("An error occured writing the output file at \"{}\".".format(output_file_path))
 
+    # =================================
+    # Model Training functions
+    # =================================
+
     def train_model(
         self,
         path_data_training: str,
@@ -331,36 +347,6 @@ class SpacyUtils:
             nlp.to_disk(model_path)
             return best
 
-    def display_text_prediction(self, model_path: str, text: str):
-        """
-        Given a path to an existent Spacy model and a raw text, uses the model
-        to output predictions and serve them at port 5030 using DisplayCy.
-
-        :param model_path: A string representing the path to a Spacy model.  
-        :param text: A string representing raw text for the model to predict
-        results.  
-        """
-        nlp = spacy.load(model_path, disable=["tagger", "parser"])
-        doc = nlp(text)
-        spacy.displacy.serve(doc, style="ent", page=True, port=5030)
-
-    def evaluate(self, model_path: str, text: str, entity_occurences: list):
-        """
-        Given a path to an existent Spacy model, a raw text and a list of
-        entity occurences, computes a Spacy model score to return the Scorer
-        scores.
-        """
-        scorer = Scorer()
-        nlp = spacy.load(model_path)
-        try:
-            doc_gold_text = nlp.make_doc(text)
-            gold = GoldParse(doc_gold_text, entities=entity_occurences)
-            pred_value = nlp(text)
-            scorer.score(pred_value, gold)
-            return scorer.scores
-        except Exception as e:
-            print(e)
-
     def train_all_files_in_folder(
         self,
         training_files_path: str,
@@ -408,6 +394,40 @@ class SpacyUtils:
             logger.info("Maximum considerable losses is \"{}\".".format(best_losses))
         diff = datetime.datetime.now() - begin_time
         logger.info("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
+
+    # =================================
+    # Evaluation and display functions
+    # =================================
+
+    def display_text_prediction(self, model_path: str, text: str):
+        """
+        Given a path to an existent Spacy model and a raw text, uses the model
+        to output predictions and serve them at port 5030 using DisplayCy.
+
+        :param model_path: A string representing the path to a Spacy model.  
+        :param text: A string representing raw text for the model to predict
+        results.  
+        """
+        nlp = spacy.load(model_path, disable=["tagger", "parser"])
+        doc = nlp(text)
+        spacy.displacy.serve(doc, style="ent", page=True, port=5030)
+
+    def evaluate(self, model_path: str, text: str, entity_occurences: list):
+        """
+        Given a path to an existent Spacy model, a raw text and a list of
+        entity occurences, computes a Spacy model score to return the Scorer
+        scores.
+        """
+        scorer = Scorer()
+        nlp = spacy.load(model_path)
+        try:
+            doc_gold_text = nlp.make_doc(text)
+            gold = GoldParse(doc_gold_text, entities=entity_occurences)
+            pred_value = nlp(text)
+            scorer.score(pred_value, gold)
+            return scorer.scores
+        except Exception as e:
+            print(e)
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
