@@ -417,6 +417,11 @@ class SpacyUtils:
         Given a path to an existent Spacy model, a raw text and a list of
         entity occurences, computes a Spacy model score to return the Scorer
         scores.
+
+        :param model_path: A string representing the directory of an existent
+        Spacy model.  
+        :param text: A raw text to use as evaluation data.  
+        :param entity_occurences: A list of entity occurrences.  
         """
         scorer = Scorer()
         nlp = spacy.load(model_path)
@@ -428,6 +433,36 @@ class SpacyUtils:
             return scorer.scores
         except Exception as e:
             print(e)
+
+    def count_examples(self, files_path: str, entities: list):
+        """
+        Given the path to a dataturks .json format input file directory and a
+        list of entities, prints the total number of examples by label.
+
+        :param files_path: Directory pointing to dataturks .json files to
+        be converted.  
+        :param entities: A list of entities, separated by comma, to be
+        considered in the final output.  
+        """
+        entities = entities.split(",")
+        input_files_dir_path = files_path
+        onlyfiles = [
+            f
+            for f in listdir(input_files_dir_path)
+            if isfile(join(input_files_dir_path, f))
+        ]
+        all_entities = {}
+        for entity in entities:
+            entity_length = 0
+            for file_ in onlyfiles:
+                validation_data = convert_dataturks_to_spacy(
+                    input_files_dir_path + file_, [entity]
+                )
+                for _, annotations in validation_data:
+                    occurences = annotations.get("entities")
+                    entity_length = entity_length + len(occurences)
+            all_entities[entity] = entity_length
+        logger.info(f"Total entities output: {all_entities}")
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
