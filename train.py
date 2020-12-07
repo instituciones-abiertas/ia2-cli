@@ -85,46 +85,59 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
         return None
 
 
-class SpacyConverterTrainer:
+class SpacyUtils:
     """
-    Convertidor de formato Dataturks a Spacy y eliminador de repetidos.
+    SpacyUtils: Dataturks format converter and other Spacy model utilities.
 
-    Metodos disponibles:
-    create_blank_model(path_save_model: str)--> Crea un modelo en blanco
-    create_custom_spacy_model(spacy_model: str, path_save_model: str)--> crea un modelo partiendo de un modelo de  spacy
-    add_new_entity_to_model(ents: list, model_path: str)--> Agrega nuevas entidades para entrenar al modelo
-    train_model(
-        path_data_training: str, n_iter: int, model_path: str, ents: list
-    )--> Entrena un modelo n_iter veces con la data en formato dataturks pasada.
+    Methods
+    -------
+
+    + create_blank_model(path_save_model: str)
+        Creates a blank Spacy model.
+    + create_custom_spacy_model(spacy_model: str, path_save_model: str)
+        Creates a model that extends from: "es_core_news_sm", "es_core_news_md", "es_core_news_lg".
+    + add_new_entity_to_model(ents: list, model_path: str)
+        Adds entities to an existing model.
+    + train_model(path_data_training: str, n_iter: int, model_path: str, ents: list)
+        Given a training dataset, trains an existing Spacy model. Accepts:
+        iterations number and list of entities.
     """
 
     def create_blank_model(self, path_save_model: str):
         """
-        Crea un modelo en blanco.
-        :param path_save_model: path donde se guardar el modelo
+        Given an output path creates a blank model using the "es" language.
+        :param path_save_model: A string representing an output path.  
 
         """
         nlp = spacy.blank("es")
         nlp.to_disk(path_save_model)
-        logger.info("Modelo creado exitosamente {path_save_model}...")
+        logger.info("Succesfully created model at: \"{}...\"".format(
+            path_save_model
+        ))
 
     def create_custom_spacy_model(self, spacy_model: str, path_save_model: str):
         """
-        Crea un modelo en base al modelo pasado por parametro.
-        :param spacy_model: modelo de spacy a partir de base
-        :param path_save_model: path donde se guardar el modelo
+        Given a Spacy model name and an output path, loads the model using the
+        Spacy api and saves it at the given path.
 
+        :param spacy_model: A string representing a Spacy model. E.g.:
+        "es_core_news_lg".  
+        :param path_save_model: A string representing the output path where the
+        model should be written.  
         """
         nlp = spacy.load(spacy_model)
         nlp.to_disk(path_save_model)
-        logger.info("Modelo creado exitosamente {path_save_model}...")
+        logger.info("Succesfully created model at: \"{}\".".format(
+            path_save_model
+        ))
 
     def add_new_entity_to_model(self, ents: list, model_path: str):
         """
-        Agrega nuevas entidades al modelo para entrenar
-        :param ents: lista de entidades a entrenar
-        :param model_path: path del modelo a  utilizar
+        Given a list of entities and a Spacy model path, adds every entity to
+        the model and updates the model to the given path.
 
+        :param ents: A list of string representing entites  
+        :param model_path: A model path  
         """
 
         nlp = spacy.load(model_path)
@@ -137,30 +150,34 @@ class SpacyConverterTrainer:
         print(ner.move_names)
         nlp.to_disk(model_path)
 
-        logger.info("Agregados exitosamente las entidades al {model_path}...")
+        logger.info("Succesfully added entities at model: \"{}\".".format(
+            model_path
+        ))
 
     def convert_dataturks_to_spacy(
         self, input_file_path: str, output_file_path: str, entities: list
     ):
         """
-        Dada la ruta de un documento en formato dataturks, una ruta donde
-        almacenar la salida del programa y una lista de entidades a procesar, se
-        transforma el documento dado a formato Spacy y se almacena en la ruta
-        de salida.
+        Given a dataturks format .json file, an output path and a list of
+        entities, converts the input data into Spacy recognisable format to
+        pickle dump it at the given output path.
 
-        :param input_file_path: ruta del documento en formato dataturks
-        :param output_file_path: ruta del directorio donde se almacenará la
-        conversión
-        :param entities: lista de entidades a procesar en el documento dado
+        :param input_file_path: A string representing the path to a dataturks
+        .json format input file.  
+        :param output_file_path: A string representing the output path.  
+        :param entities: A list of string representing entities to recognise
+        during data conversion.  
         """
-        logger.info(f"Loading convert data from {input_file_path} ...")
+        logger.info(f"Starts converting data from \"{input_file_path}\"...")
         training_data = []
         log = convert_dataturks_to_spacy(input_file_path, entities)
         with open(output_file_path, "a+") as f:
             training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
         with open(output_file_path, "wb") as output:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
-        logger.info("Información convertida exitosamente")
+        logger.info("Succesfully converted data at \"{}\".".format(
+            output_file_path
+        ))
 
     def convert_dataturks_to_training_cli(self,
         input_files_path: str,
@@ -173,10 +190,10 @@ class SpacyConverterTrainer:
         writes it out to the given output directory.
 
         :param input_files_path: Directory pointing to dataturks .json files to
-        be converted
+        be converted.  
         :param entities: A list of entities, separated by comma, to be
-        considered during annotations extraction from each dadaturks batch.
-        :param output_file_path: The path and name of the output file.
+        considered during annotations extraction from each dadaturks batch.  
+        :param output_file_path: The path and name of the output file.  
         """
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
 
@@ -241,42 +258,50 @@ class SpacyConverterTrainer:
         model_path: str,
         ents: list,
         path_best_model: str,
-        best_losses: float,
+        max_losses: float,
     ):
         """
-        Dado una data en formato dataturks, la transforma para formato spacy.
-        :param path_data_training: path de la info a entrenar
-        :param n_iter: Numero de cantidad de veces que se va correr el scripts
-        :param model_path: path del modelo a  utilizar
-        :ents: lista de entidades a entrenar
+        Given a dataturks .json format input file, a list of entities and a path
+        to an existent Spacy model, trains that model for `n_iter` iterations
+        with the given entities. Whenever a best model is found it is writen to
+        disk at the given output path.
+
+        :param path_data_training: A string representing the path to the input
+        file.  
+        :param n_iter: An integer representing a number of iterations.  
+        :param model_path: A string representing the path to the model to train.  
+        :param ents: A list of string representing the entities to consider
+        during training.  
+        :param path_best_model: A string representing the path to write the best
+        trained model.  
+        :param max_losses: A float representing the maximum NER losses value
+        to consider before start writing best models output.  
         """
-        best = best_losses
-
+        best = max_losses
         training_data = convert_dataturks_to_spacy(path_data_training, ents)
-
         nlp = spacy.load(model_path)
-
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
+
+        # Creates a ner pipe if it does not exist.
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
             nlp.add_pipe(component)
         ner = nlp.get_pipe("ner")
 
         for _, annotations in training_data:
-
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
 
-        # only train NER
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
-            # show warnings for misaligned entity spans once
+            # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             nlp.begin_training()
 
             for itn in range(n_iter):
-                random.shuffle(training_data)  # Se randomiza
+                # Randomizes training data
+                random.shuffle(training_data)
                 losses = {}
                 # Creates mini batches
                 batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
@@ -285,8 +310,10 @@ class SpacyConverterTrainer:
                     texts, annotations = zip(*batch)
 
                     nlp.update(
-                        texts, # batch of raw texts
-                        annotations, # batch of annotations
+                        # batch of raw texts
+                        texts,
+                        # batch of annotations
+                        annotations,
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
@@ -296,26 +323,33 @@ class SpacyConverterTrainer:
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
-                        logger.info("💾 >>> Saving model with losses: [{}]".format(best))
+                        logger.info("💾 Saving model with losses: [{}]".format(best))
 
                 except Exception:
-                    logger.info("Batch sin entidades entrenadas")
+                    logger.exception("The batch has no training data.")
 
-            # writes model to output directory
             nlp.to_disk(model_path)
             return best
 
-    def get_entities(self, model_path: str, text: str):
+    def display_text_prediction(self, model_path: str, text: str):
         """
-        Dado una data en formato dataturks, la transforma para formato spacy.
-        :param model_path:ruta del modelo
-        :param text: texto a traducir.
+        Given a path to an existent Spacy model and a raw text, uses the model
+        to output predictions and serve them at port 5030 using DisplayCy.
+
+        :param model_path: A string representing the path to a Spacy model.  
+        :param text: A string representing raw text for the model to predict
+        results.  
         """
         nlp = spacy.load(model_path, disable=["tagger", "parser"])
         doc = nlp(text)
         spacy.displacy.serve(doc, style="ent", page=True, port=5030)
 
     def evaluate(self, model_path: str, text: str, entity_occurences: list):
+        """
+        Given a path to an existent Spacy model, a raw text and a list of
+        entity occurences, computes a Spacy model score to return the Scorer
+        scores.
+        """
         scorer = Scorer()
         nlp = spacy.load(model_path)
         try:
@@ -327,7 +361,7 @@ class SpacyConverterTrainer:
         except Exception as e:
             print(e)
 
-    def all_files_in_folder(
+    def train_all_files_in_folder(
         self,
         training_files_path: str,
         n_iter: int,
@@ -337,23 +371,21 @@ class SpacyConverterTrainer:
         max_losses: float,
     ):
         """
-        Dada la ruta de un directorio de documentos dataturks de entrenamiento,
-        un número de iteraciones, la ruta de un modelo, una lista de entidades a
-        procesar, una ruta donde almacenar el mejor modelo obtenido y un número
-        que represente el mayor puntaje de pérdidas aceptado, se entrena el
-        modelo dado con los documentos de entrenamiento definidos en
-        `training_files_path` con `n_iter` iteraciones. Cada vez que se analiza
-        un archivo de entrenamiento se evalúa y compara la cantidad de pérdidas
-        obtenidas con las máximas soportadas `max_losses` para almacenar un
-        modelo aceptable en `best_model_path`.
+        Given the path to a dataturks .json format input file directory, a list
+        of entities and a path to an existent Spacy model, trains that model for
+        `n_iter` iterations with the given entities. Whenever a best model is
+        found it is writen to disk at the given output path.
 
-        :param training_files_path: ruta del directorio de los archivos de
-        entrenamiento.
-        :param n_iter: número de iteraciones entre actualizaciones de modelo
-        :param model_path: ruta del modelo a utilizar
-        :param entities: lista de entidades a anonimizar
-        :param best_model_path: directorio donde se almacenará el mejor modelo
-        :param max_losses: cantidad máxima de losses permitidos para almacenar un mejor modelo
+        :param training_files_path: A string representing the path to the input
+        files directory.  
+        :param n_iter: An integer representing a number of iterations.  
+        :param model_path: A string representing the path to the model to train.  
+        :param entities: A list of string representing the entities to consider
+        during training.  
+        :param best_model_path: A string representing the path to write the best
+        trained model.  
+        :param max_losses: A float representing the maximum NER losses value
+        to consider before start writing best models output.  
         """
         begin_time = datetime.datetime.now()
         onlyfiles = [
@@ -363,20 +395,19 @@ class SpacyConverterTrainer:
         ]
         # self.add_new_entity_to_model(entities, model_path)
         best_losses = max_losses
-        for file in onlyfiles:
-            logger.info("Se esta procesando {}".format(file))
+        for file_name in onlyfiles:
+            logger.info("Started processing file at \"{}\"...".format(file_name))
             best_losses = self.train_model(
-                training_files_path + file,
+                training_files_path + file_name,
                 n_iter,
                 model_path,
                 entities,
                 best_model_path,
                 best_losses,
             )
-            logger.info("Se guardo un modelo con {}".format(best_losses))
+            logger.info("Maximum considerable losses is \"{}\".".format(best_losses))
         diff = datetime.datetime.now() - begin_time
         logger.info("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
 
-
 if __name__ == "__main__":
-    fire.Fire(SpacyConverterTrainer)
+    fire.Fire(SpacyUtils)
