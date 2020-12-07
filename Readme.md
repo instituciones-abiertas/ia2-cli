@@ -30,7 +30,7 @@ python train.py --help
 python -m spacy download es_core_news_lg
 ```
 
-#### Crear un modelo en español vacío
+#### Crear un modelo vacío
 
 - `model_name`: nombre del modelo a utilizar como base del nuevo
 - `output_path`: directorio donde se almacenará el nuevo modelo
@@ -39,7 +39,7 @@ python -m spacy download es_core_news_lg
 python train.py create_custom_spacy_model <model_name> <output_path>
 ```
 
-**Ejemplo:**
+**Ejemplo para un modelo en español:**
 
 ```bash
 python train.py create_custom_spacy_model \
@@ -88,7 +88,7 @@ python train.py train_model \
 - `max_losses`: (número flotante) Máximo valor de Losses soportado
 
 ```bash
-python train.py train_model \
+python train.py train_all_files_in_folder \
   <batches_path> \
   <iter_n> \
   <model_path> \
@@ -100,7 +100,7 @@ python train.py train_model \
 **Ejemplo:**
 
 ```bash
-python train.py all_files_in_folder \
+python train.py train_all_files_in_folder \
   data/training/batches-2020-11-24/ \
   2 \
   models/base/2020-12-01 \
@@ -117,13 +117,13 @@ El siguiente comando permite visualizar resultados de un entrenamiento utilizand
 - `test_text`: string que represente un texto de prueba
 
 ```bash
-python train.py get_entities <model_path> <test_text>
+python train.py display_text_prediction <model_path> <test_text>
 ```
 
 **Ejemplo:**
 
 ```bash
-python train.py get_entities \
+python train.py display_text_prediction \
   models/base/2020-12-01 \
   "Soy un texto de prueba para detectar alguna entidad"
 ```
@@ -137,10 +137,10 @@ python train.py get_entities \
 - `annotations`: lista de ocurrencias de etiquetas `[(`)]`
 
 ```bash
-python train.py scorer_model <model_path> <test_text> <annotations>
+python train.py evaluate <model_path> <test_text> <annotations>
 ```
 
-**Ejemplo**:
+**Ejemplo:**
 
 ```bash
 python train.py scorer_model \
@@ -152,27 +152,29 @@ python train.py scorer_model \
 #### Guardar en un archivo los logs del proceso
 
 ```bash
-python train.py all_files_in_folder \
+python train.py train_all_files_in_folder \
   data/training/batches-2020-11-24/ \
   2 \
   models/base/2020-12-01 \
-  [FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD] > logs_file_name.txt
+  "FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD" > logs_file_name.txt
 ```
 
-#### Convertir un Batch Dataturks a JSON Spacy para usar CLI
+#### Conversion de datasets
+
+El siguiente comando transforma una serie de documentos `.json` en formato dataturks a un dataset único, también en formato `.json`, soportado por la CLI de Spacy.
 
 ```bash
-convert_dataturks_to_training_cli
-path_batch_a_convertir \
-path_json_resultante \
-lista_entidades_a_presevar \
+python train.py convert_dataturks_to_training_cli \
+  <input_files_path> \
+  <entities> \
+  <output_file_path>
 ```
 
-##### Ejemplo
+**Ejemplo:**
 
 ```bash
-convert_dataturks_to_training_cli
-Batch_05.json \
-batch_05_spacy.json \
-"PER, LOC" \
+python train.py convert_dataturks_to_training_cli \
+  "data/raw/training" \
+  "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, ARTÍCULO, PATENTE_DOMINIO" \
+  "data/spacy/training/training_data.json"
 ```
