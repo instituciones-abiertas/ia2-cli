@@ -47,6 +47,23 @@ python train.py create_custom_spacy_model \
   "models/base/2020-12-01"
 ```
 
+#### Agregar entidades a un modelo
+
+- `ents`: Strings de las entidades sin espacio
+- `model_path`: directorio del modelo custom a utilizar
+
+```bash
+python train.py add_new_entity_to_model \
+  <ents> \
+  <model_path> \
+```
+
+```bash
+python train.py add_new_entity_to_model \
+"PER,LOC,DIRECCIÓN,OCUPACIÓN/PROFESIÓN,PATENTE_DOMINIO,ARTÍCULO" \
+modelos/modelo10-12 \
+```
+
 #### Entrenar con un batch
 
 - `batch_path`: path de un archivo (`.json`) de entrenamiento.

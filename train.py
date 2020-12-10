@@ -7,6 +7,7 @@ import random
 import datetime
 import os
 import re
+import sys
 import spacy
 from spacy.util import minibatch, compounding, filter_spans
 from spacy.gold import biluo_tags_from_offsets
@@ -147,15 +148,15 @@ class SpacyUtils:
         :param ents: A list of string representing entites  
         :param model_path: A model path  
         """
-
+        arr = sys.argv[2].split(',')
         nlp = spacy.load(model_path)
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
             nlp.add_pipe(component)
         ner = nlp.get_pipe("ner")
-        for ent in ents:
+        for ent in arr:
             ner.add_label(ent)
-        print(ner.move_names)
+        print("Entities add to model {}".format(ner.move_names))
         nlp.to_disk(model_path)
 
         logger.info("Succesfully added entities at model: \"{}\".".format(
