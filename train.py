@@ -8,6 +8,7 @@ import datetime
 import os
 import re
 import sys
+import subprocess
 import spacy
 from spacy.util import minibatch, compounding, filter_spans
 from spacy.gold import biluo_tags_from_offsets
@@ -464,6 +465,20 @@ class SpacyUtils:
                     entity_length = entity_length + len(occurences)
             all_entities[entity] = entity_length
         logger.info(f"Total entities output: {all_entities}")
+
+    def run_command_with_timer(self,*args):
+        """
+        Calculate the time spend to run command
+
+        :param *args: run command
+        """  
+        begin_time = datetime.datetime.now()
+        logger.info("####START####")
+        logger.info("Start process {} ".format(begin_time))
+        subprocess.call(args[0],shell=True)
+        end = datetime.datetime.now()
+        logger.info("End {} to process ".format(end))
+        logger.info("Spend {} to process ".format(end-begin_time))
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)

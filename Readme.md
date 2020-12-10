@@ -195,3 +195,24 @@ python train.py convert_dataturks_to_training_cli \
   "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, ARTÍCULO, PATENTE_DOMINIO" \
   "data/spacy/training/training_data.json"
 ```
+
+#### Correr un comando con un timer:
+
+Poder correr un comando en consola y se guarda en el logger el horario de comienzo y de fin
+
+- `command_to_run`: Es el comando a ejecutar con parametros y espacios incluido.Va entre comillas dobles
+
+```bash
+python train.py run_command_with_timer "command_to_run"
+```
+
+```bash
+ python train.py run_command_with_timer "python -m spacy train \
+   es \
+   modelos/09-12-2020-03 \
+   DatasetIntegrados/entrenamiento_circuito3.json \
+   DatasetIntegrados/validacion_circuito1.json  \
+   --pipeline=ner \
+   --n-iter=2 \
+   --base-model modelos/modelo10-12"
+```
