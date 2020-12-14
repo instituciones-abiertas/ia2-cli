@@ -117,9 +117,7 @@ class SpacyUtils:
         """
         nlp = spacy.blank("es")
         nlp.to_disk(output_path)
-        logger.info("Succesfully created model at: \"{}...\"".format(
-            output_path
-        ))
+        logger.info(f"Succesfully created model at: \"{output_path}...\"")
 
     def create_custom_spacy_model(self, spacy_model: str, output_path: str):
         """
@@ -133,9 +131,7 @@ class SpacyUtils:
         """
         nlp = spacy.load(spacy_model)
         nlp.to_disk(output_path)
-        logger.info("Succesfully created model at: \"{}\".".format(
-            output_path
-        ))
+        logger.info(f"Succesfully created model at: \"{output_path}\".")
 
     # =================================
     # Update Models functions
@@ -157,13 +153,11 @@ class SpacyUtils:
         ner = nlp.get_pipe("ner")
         for ent in arr:
             ner.add_label(ent)
-        print("Entities add to model {}".format(ner.move_names))
+        print(f"Entities add to model {ner.move_names}")
         nlp.begin_training()
         nlp.to_disk(model_path)
 
-        logger.info("Succesfully added entities at model: \"{}\".".format(
-            model_path
-        ))
+        logger.info(f"Succesfully added entities at model: \"{model_path}\".")
 
     # =================================
     # Data Conversion functions
@@ -190,9 +184,7 @@ class SpacyUtils:
             training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
         with open(output_file_path, "wb") as output:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
-        logger.info("Succesfully converted data at \"{}\".".format(
-            output_file_path
-        ))
+        logger.info(f"Succesfully converted data at \"{output_file_path}\".")
 
     def convert_dataturks_to_training_cli(self,
         input_files_path: str,
@@ -221,17 +213,17 @@ class SpacyUtils:
         ]
 
         for input_file in input_files:
-            logger.info("Extracting raw data and occurrences from file: \"{}\"...".format(input_file))
+            logger.info(f"Extracting raw data and occurrences from file: \"{input_file}\"...")
             extracted_data = convert_dataturks_to_spacy(
                 f"{input_files_path}/{input_file}",
                 entities
             )
             TRAIN_DATA = TRAIN_DATA + extracted_data
-            logger.info("Finished extracting data from file \"{}\".".format(input_file))
+            logger.info(f"Finished extracting data from file \"{input_file}\".")
 
         diff = datetime.datetime.now() - begin_time
-        logger.info("Lasted {} to extract dataturks data from {} documents.".format(diff, len(input_files)))
-        logger.info("Converting {} Documents with Occurences extracted from {} files into Spacy supported format...".format(len(TRAIN_DATA), len(input_files)))
+        logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
+        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")
 
         docs = []
         for text, annot in TRAIN_DATA:
@@ -257,14 +249,14 @@ class SpacyUtils:
             docs.append(doc)
 
         diff = datetime.datetime.now() - begin_time
-        logger.info("Finished Converting {} Spacy Documents into trainable data. Lasted: ".format(len(TRAIN_DATA), diff))
+        logger.info(f"Finished Converting {len(TRAIN_DATA)} Spacy Documents into trainable data. Lasted: {diff}")
 
         try:
-            logger.info("💾 Writing final output at \"{}\"...".format(output_file_path))
+            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")
             srsly.write_json(output_file_path, [docs_to_json(docs)])
             logger.info("💾 Done.")
         except Exception:
-            logging.exception("An error occured writing the output file at \"{}\".".format(output_file_path))
+            logging.exception(f"An error occured writing the output file at \"{output_file_path}\".")
 
     # =================================
     # Model Training functions
@@ -336,13 +328,13 @@ class SpacyUtils:
                         drop=DROPOUT_RATE,
                         losses=losses,
                     )
-                logger.info("⬇️ Losses rate: [{}]".format(losses))
+                logger.info(f"⬇️ Losses rate: [{losses}]")
                 try:
                     numero_losses = losses.get("ner")
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
-                        logger.info("💾 Saving model with losses: [{}]".format(best))
+                        logger.info(f"💾 Saving model with losses: [{best}]")
 
                 except Exception:
                     logger.exception("The batch has no training data.")
@@ -385,7 +377,7 @@ class SpacyUtils:
         # self.add_new_entity_to_model(entities, model_path)
         best_losses = max_losses
         for file_name in onlyfiles:
-            logger.info("Started processing file at \"{}\"...".format(file_name))
+            logger.info(f"Started processing file at \"{file_name}\"...")
             best_losses = self.train_model(
                 training_files_path + file_name,
                 n_iter,
@@ -394,9 +386,9 @@ class SpacyUtils:
                 best_model_path,
                 best_losses,
             )
-            logger.info("Maximum considerable losses is \"{}\".".format(best_losses))
+            logger.info(f"Maximum considerable losses is \"{best_losses}\".")
         diff = datetime.datetime.now() - begin_time
-        logger.info("Lasted {} to process {} documents.".format(diff, len(onlyfiles)))
+        logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
     # =================================
     # Evaluation and display functions
@@ -475,11 +467,11 @@ class SpacyUtils:
         """  
         begin_time = datetime.datetime.now()
         logger.info("####START####")
-        logger.info("Start process {} ".format(begin_time))
+        logger.info(f"Start process {begin_time} ")
         subprocess.call(args[0],shell=True)
         end = datetime.datetime.now()
-        logger.info("End {} to process ".format(end))
-        logger.info("Spend {} to process ".format(end-begin_time))
+        logger.info(f"End {end} to process ")
+        logger.info(f"Spend {end-begin_time} to process ")
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
