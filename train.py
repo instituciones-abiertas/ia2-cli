@@ -153,11 +153,12 @@ class SpacyUtils:
         nlp = spacy.load(model_path)
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
-            nlp.add_pipe(component)
+            nlp.add_pipe(component,last=True)
         ner = nlp.get_pipe("ner")
         for ent in arr:
             ner.add_label(ent)
         print("Entities add to model {}".format(ner.move_names))
+        nlp.begin_training()
         nlp.to_disk(model_path)
 
         logger.info("Succesfully added entities at model: \"{}\".".format(
