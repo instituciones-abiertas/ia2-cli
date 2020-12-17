@@ -286,6 +286,48 @@ class SpacyUtils:
 
         return best
 
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
+        score_f1_best = 0
+        current_patience = 0
+        patience = 10
+
+        for itn in range(n_iter):
+            # Randomizes training data
+            random.shuffle(training_data)
+            losses = {}
+            # Creates mini batches
+            batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
+
+            for batch in batches:
+                texts, annotations = zip(*batch)
+
+                nlp.update(
+                    texts, # batch of raw texts
+                    annotations, # batch of annotations
+                    drop=DROPOUT_RATE,
+                    losses=losses,
+                    sgd=optimizer,
+                )
+                try:
+                    scores = self.evaluate_multiple(nlp, texts, annotations)
+                    numero_losses = losses.get("ner")
+                    if numero_losses < best and numero_losses > 0:
+                        best = numero_losses
+                        nlp.to_disk(path_best_model)
+                        logger.info(f"💾 Saving model with losses: [{best}]")
+                    # else:
+                        # current_patience +=1
+
+                except Exception:
+                    logger.exception("The batch has no training data.")
+
+            logger.info(f"⬇️ Losses rate: [{losses}]")
+
+
+            if current_patience == patience:
+                break
+
+            return best
 
     def train_model(
         self,
@@ -335,14 +377,7 @@ class SpacyUtils:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
 
-            for itn in range(n_iter):
-                # Randomizes training data
-                random.shuffle(training_data)
-                losses = {}
-                # Creates mini batches
-                batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
-
-                best = self.train_batches(optimizer, nlp, batches, losses, best, path_best_model)
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model)
             
             nlp.to_disk(model_path)
             return best
@@ -416,7 +451,7 @@ class SpacyUtils:
         doc = nlp(text)
         spacy.displacy.serve(doc, style="ent", page=True, port=5030)
 
-    def evaluate(self, model_path: str, text: str, entity_occurences: list):
+    def evaluate(self, nlp, text: str, entity_ocurrences: list):
         """
         Given a path to an existent Spacy model, a raw text and a list of
         entity occurences, computes a Spacy model score to return the Scorer
@@ -428,15 +463,22 @@ class SpacyUtils:
         :param entity_occurences: A list of entity occurrences.  
         """
         scorer = Scorer()
-        nlp = spacy.load(model_path)
         try:
+            # import pdb; pdb.set_trace()
             doc_gold_text = nlp.make_doc(text)
-            gold = GoldParse(doc_gold_text, entities=entity_occurences)
+            gold = GoldParse(doc_gold_text, entities=entity_ocurrences)
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
             return scorer.scores
         except Exception as e:
             print(e)
+
+    def evaluate_multiple(self, nlp, texts: list, entity_occurences: list):
+        for idx in range(len(texts)):
+            text = texts[idx]
+            entities_for_text = entity_occurences[idx]
+            scores = self.evaluate(nlp, text, entities_for_text)
+            print(f"scorer values: {scores}")  #ver ents_f?
 
     def count_examples(self, files_path: str, entities: list):
         """
