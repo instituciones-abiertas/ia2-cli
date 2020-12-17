@@ -290,8 +290,9 @@ class SpacyUtils:
         score_f1_best = 0
         current_patience = 0
         patience = 10
+        itn = 0
 
-        for itn in range(n_iter):
+        while itn <= n_iter:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
@@ -309,23 +310,27 @@ class SpacyUtils:
                     sgd=optimizer,
                 )
                 try:
+                    #TODO deberíamos usar estos scores para evaluar si guardar el modelo o no
                     scores = self.evaluate_multiple(nlp, texts, annotations)
                     numero_losses = losses.get("ner")
+                    #TODO evaluar los scores
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
                         logger.info(f"💾 Saving model with losses: [{best}]")
-                    # else:
-                        # current_patience +=1
+                    else:
+                        current_patience += 1
 
                 except Exception:
                     logger.exception("The batch has no training data.")
 
             logger.info(f"⬇️ Losses rate: [{losses}]")
 
-
             if current_patience == patience:
+                #NO more patience for this batch!
                 break
+
+            itn += 1
 
             return best
 
