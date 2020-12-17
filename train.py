@@ -10,7 +10,7 @@ import re
 import sys
 import subprocess
 import spacy
-from spacy.util import minibatch, compounding, filter_spans
+from spacy.util import minibatch, compounding, filter_spans, decaying
 from spacy.gold import biluo_tags_from_offsets
 from spacy.scorer import Scorer
 from spacy.gold import GoldParse, docs_to_json
@@ -262,6 +262,31 @@ class SpacyUtils:
     # Model Training functions
     # =================================
 
+    def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
+        for batch in batches:
+            texts, annotations = zip(*batch)
+
+            nlp.update(
+                texts, # batch of raw texts
+                annotations, # batch of annotations
+                drop=DROPOUT_RATE,
+                losses=losses,
+                sgd=optimizer,
+            )
+        logger.info(f"⬇️ Losses rate: [{losses}]")
+        try:
+            numero_losses = losses.get("ner")
+            if numero_losses < best and numero_losses > 0:
+                best = numero_losses
+                nlp.to_disk(path_best_model)
+                logger.info(f"💾 Saving model with losses: [{best}]")
+
+        except Exception:
+            logger.exception("The batch has no training data.")
+
+        return best
+
+
     def train_model(
         self,
         path_data_training: str,
@@ -308,7 +333,7 @@ class SpacyUtils:
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
-            nlp.begin_training()
+            optimizer = nlp.begin_training()
 
             for itn in range(n_iter):
                 # Randomizes training data
@@ -317,28 +342,8 @@ class SpacyUtils:
                 # Creates mini batches
                 batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
 
-                for batch in batches:
-                    texts, annotations = zip(*batch)
-
-                    nlp.update(
-                        # batch of raw texts
-                        texts,
-                        # batch of annotations
-                        annotations,
-                        drop=DROPOUT_RATE,
-                        losses=losses,
-                    )
-                logger.info(f"⬇️ Losses rate: [{losses}]")
-                try:
-                    numero_losses = losses.get("ner")
-                    if numero_losses < best and numero_losses > 0:
-                        best = numero_losses
-                        nlp.to_disk(path_best_model)
-                        logger.info(f"💾 Saving model with losses: [{best}]")
-
-                except Exception:
-                    logger.exception("The batch has no training data.")
-
+                best = self.train_batches(optimizer, nlp, batches, losses, best, path_best_model)
+            
             nlp.to_disk(model_path)
             return best
 
@@ -376,6 +381,7 @@ class SpacyUtils:
         ]
         # self.add_new_entity_to_model(entities, model_path)
         best_losses = max_losses
+        processed_docs = 0
         for file_name in onlyfiles:
             logger.info(f"Started processing file at \"{file_name}\"...")
             best_losses = self.train_model(
@@ -386,7 +392,10 @@ class SpacyUtils:
                 best_model_path,
                 best_losses,
             )
+            processed_docs = processed_docs + 1
+            print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
             logger.info(f"Maximum considerable losses is \"{best_losses}\".")
+            logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
         diff = datetime.datetime.now() - begin_time
         logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
