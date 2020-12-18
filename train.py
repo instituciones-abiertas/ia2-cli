@@ -310,10 +310,9 @@ class SpacyUtils:
                     sgd=optimizer,
                 )
                 try:
-                    #TODO deberíamos usar estos scores para evaluar si guardar el modelo o no
                     scores = self.evaluate_multiple(nlp, texts, annotations)
+                    #TODO probar con f-score, accuracy
                     numero_losses = losses.get("ner")
-                    #TODO evaluar los scores
                     if numero_losses < best and numero_losses > 0:
                         best = numero_losses
                         nlp.to_disk(path_best_model)
@@ -469,9 +468,8 @@ class SpacyUtils:
         """
         scorer = Scorer()
         try:
-            # import pdb; pdb.set_trace()
             doc_gold_text = nlp.make_doc(text)
-            gold = GoldParse(doc_gold_text, entities=entity_ocurrences)
+            gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get('entities'))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
             return scorer.scores
