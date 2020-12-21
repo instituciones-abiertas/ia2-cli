@@ -287,9 +287,9 @@ class SpacyUtils:
         return best
 
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
-        score_f1_best = 0
-        current_patience = 0
-        patience = 10
+        best_f_score = 0
+        early_stop = 0
+        not_improve = 10
         itn = 0
 
         while itn <= n_iter:
@@ -309,29 +309,31 @@ class SpacyUtils:
                     losses=losses,
                     sgd=optimizer,
                 )
-                try:
-                    scores = self.evaluate_multiple(nlp, texts, annotations)
-                    #TODO probar con f-score, accuracy
-                    numero_losses = losses.get("ner")
-                    if numero_losses < best and numero_losses > 0:
-                        best = numero_losses
+            try:
+                f_score, precision_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
+                # print(f"f-score {f_score} -  precision score {precision_score}")
+                if f_score >= best_f_score and f_score > 0:
+                    early_stop = 0
+                    best_f_score = f_score
+                    with nlp.use_params(optimizer.averages):
                         nlp.to_disk(path_best_model)
-                        logger.info(f"💾 Saving model with losses: [{best}]")
-                    else:
-                        current_patience += 1
+                    logger.info(f"💾 Saving model with f1-score {f_score}")
+                else:
+                    early_stop += 1
 
-                except Exception:
-                    logger.exception("The batch has no training data.")
+            except Exception:
+                logger.exception("The batch has no training data.")
 
-            logger.info(f"⬇️ Losses rate: [{losses}]")
+            logger.info(f"Losses rate: {losses:.6f}, f1-score: {f_score:.6f}, precision: {precision_score:.6f}")
 
-            if current_patience == patience:
-                #NO more patience for this batch!
+            if early_stop >= not_improve:
+                print(f"This batch is not improving enough, stopping training with it")
+                logger.info(f"This batch is not improving enough, stopping training with it")
                 break
 
             itn += 1
 
-            return best
+        return best
 
     def train_model(
         self,
@@ -380,7 +382,6 @@ class SpacyUtils:
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
-
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model)
             
             nlp.to_disk(model_path)
@@ -476,12 +477,17 @@ class SpacyUtils:
         except Exception as e:
             print(e)
 
-    def evaluate_multiple(self, nlp, texts: list, entity_occurences: list):
+    def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list):
+        f_score_sum = 0
+        precision_score_sum = 0
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
-            scores = self.evaluate(nlp, text, entities_for_text)
-            print(f"scorer values: {scores}")  #ver ents_f?
+            with nlp.use_params(optimizer.averages):
+                scores = self.evaluate(nlp, text, entities_for_text)
+                precision_score_sum += scores.get('ents_p')
+                f_score_sum += scores.get('ents_f')
+        return f_score_sum / len(texts), precision_score_sum / len(texts)
 
     def count_examples(self, files_path: str, entities: list):
         """
