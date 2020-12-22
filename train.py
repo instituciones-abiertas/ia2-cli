@@ -289,7 +289,7 @@ class SpacyUtils:
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
         best_f_score = 0
         early_stop = 0
-        not_improve = 10
+        not_improve = 30
         itn = 0
 
         while itn <= n_iter:
@@ -310,21 +310,24 @@ class SpacyUtils:
                     sgd=optimizer,
                 )
             try:
-                f_score, precision_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
-                # print(f"f-score {f_score} -  precision score {precision_score}")
-                if f_score >= best_f_score and f_score > 0:
+                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
+                # print(f"f-score: {f_score} -  precision: {precision_score} - recall: {recall_score}")
+                numero_losses = losses.get("ner")
+                if numero_losses < best and numero_losses > 0:
+                # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
                     early_stop = 0
+                    best = numero_losses
                     best_f_score = f_score
                     with nlp.use_params(optimizer.averages):
                         nlp.to_disk(path_best_model)
-                    logger.info(f"💾 Saving model with f1-score {f_score}")
+                    logger.info(f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}")
                 else:
                     early_stop += 1
 
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            logger.info(f"Losses rate: {losses:.6f}, f1-score: {f_score:.6f}, precision: {precision_score:.6f}")
+            logger.info(f"Losses rate: {losses}, f1-score: {f_score}, early_stop: {early_stop}")
 
             if early_stop >= not_improve:
                 print(f"This batch is not improving enough, stopping training with it")
@@ -419,8 +422,13 @@ class SpacyUtils:
             for f in listdir(training_files_path)
             if isfile(join(training_files_path, f))
         ]
+        random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
-        best_losses = max_losses
+        # FIXME NO le damos bola al max_losses que viene por parámetro, sino a la mejora en losses
+        # se debería considerar refactorizar la forma en que iteramos => n_iter, files, minibatches
+        # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo, 
+        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
+        best_losses = 300 #max_losses
         processed_docs = 0
         for file_name in onlyfiles:
             logger.info(f"Started processing file at \"{file_name}\"...")
@@ -480,14 +488,17 @@ class SpacyUtils:
     def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list):
         f_score_sum = 0
         precision_score_sum = 0
+        recall_score_sum = 0
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
                 scores = self.evaluate(nlp, text, entities_for_text)
+                recall_score_sum += scores.get('ents_r')
                 precision_score_sum += scores.get('ents_p')
                 f_score_sum += scores.get('ents_f')
-        return f_score_sum / len(texts), precision_score_sum / len(texts)
+        #we are returning this 3 values to verify how the model goes
+        return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts)
 
     def count_examples(self, files_path: str, entities: list):
         """
