@@ -186,6 +186,59 @@ class SpacyUtils:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
         logger.info(f"Succesfully converted data at \"{output_file_path}\".")
 
+    def convert_dataturks_to_train_file(self,
+        input_files_path: str,
+        entities: list,
+        output_file_path: str,
+        num_files: int = 0
+    ):
+        """
+        Given an input directory and a list of entities, converts every .json
+        file from the directory into a single .json to be used with train_model
+        method. Unlike convert_dataturks_to_training_cli this does not convert
+        documents to Spacy JSON format used in Spacy cli train command.
+        Writes it out to the given output directory.
+
+        :param input_files_path: Directory pointing to dataturks .json files to
+        be converted.  
+        :param entities: A list of entities, separated by comma, to be
+        considered during annotations extraction from each dadaturks batch.  
+        :param output_file_path: The path and name of the output file.
+        :param num_files An integer which means the numbers of files from
+        input path to be included. 0 means all files and is default option
+        """
+        
+        TRAIN_DATA = []
+        begin_time = datetime.datetime.now()
+        input_files = [
+            f
+            for f in listdir(input_files_path)
+            if isfile(join(input_files_path, f))
+        ]
+
+        if num_files == 0:
+            num_files = len(input_files)
+
+        for input_file in input_files[:num_files]:
+            logger.info(f"Extracting raw data and occurrences from file: \"{input_file}\"...")
+            extracted_data = convert_dataturks_to_spacy(
+                f"{input_files_path}/{input_file}",
+                entities
+            )
+            TRAIN_DATA = TRAIN_DATA + extracted_data
+            logger.info(f"Finished extracting data from file \"{input_file}\".")
+
+        diff = datetime.datetime.now() - begin_time
+        logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
+        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")   
+        try:
+            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")            
+            srsly.write_json(output_file_path, TRAIN_DATA)            
+            logger.info("💾 Done.")
+        except Exception:
+            logging.exception(f"An error occured writing the output file at \"{output_file_path}\".")
+
+
     def convert_dataturks_to_training_cli(self,
         input_files_path: str,
         entities: list,
@@ -291,13 +344,15 @@ class SpacyUtils:
         early_stop = 0
         not_improve = 30
         itn = 0
+        optimizer.learn_rate = 0.003
+        optimizer.beta1 = 0.7
 
         while itn <= n_iter:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
             # Creates mini batches
-            batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
+            batches = minibatch(training_data, size=32)
 
             for batch in batches:
                 texts, annotations = zip(*batch)
@@ -327,7 +382,7 @@ class SpacyUtils:
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            logger.info(f"Losses rate: {losses}, f1-score: {f_score}, early_stop: {early_stop}")
+            logger.info(f"Losses rate: {losses}, f1-score: {f_score}, precission: {precision_score} early_stop: {early_stop}")
 
             if early_stop >= not_improve:
                 print(f"This batch is not improving enough, stopping training with it")
@@ -346,6 +401,7 @@ class SpacyUtils:
         ents: list,
         path_best_model: str,
         max_losses: float,
+        is_raw: bool = True
     ):
         """
         Given a dataturks .json format input file, a list of entities and a path
@@ -362,10 +418,20 @@ class SpacyUtils:
         :param path_best_model: A string representing the path to write the best
         trained model.  
         :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.  
+        to consider before start writing best models output.
+        :param is_raw A boolean that determines if the train file will be converted.
+        True by default
         """
         best = max_losses
-        training_data = convert_dataturks_to_spacy(path_data_training, ents)
+
+        if is_raw:
+            logger.info(f"loading and converting training data from dataturks: {path_data_training}")
+            training_data = convert_dataturks_to_spacy(path_data_training, ents)
+        else:
+            logger.info(f"loading pre-converted training data JSON: {path_data_training}")
+            with open(path_data_training) as f:
+                training_data = json.load(f)
+        
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
