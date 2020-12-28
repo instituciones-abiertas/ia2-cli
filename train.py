@@ -17,6 +17,7 @@ from spacy.gold import GoldParse, docs_to_json
 import srsly
 from os import listdir
 from os.path import isfile, join
+from callbacks import print_scores_on_epoch, save_best_model, reduce_lr_on_plateau, early_stop
 
 logger = logging.getLogger('Spacy cli util')
 logger.setLevel(logging.DEBUG)
@@ -339,18 +340,37 @@ class SpacyUtils:
 
         return best
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
-        best_f_score = 0
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks = []):
+        #best_f_score = 0
         early_stop = 0
         not_improve = 30
-        itn = 0
-        optimizer.learn_rate = 0.003
-        optimizer.beta1 = 0.7
+        
+        state = {
+            "i": 0,
+            "history": {
+                "ner": [],
+                "f_score": [],
+                "recall": [],
+                "precision": [],
+            },
+            "min_ner": 0,
+            "max_f_score": 0,
+            "max_recall": 0,
+            "max_precision": 0,
+            "lr": 0.004,
+            "beta1": 0.8
+        }
 
-        while itn <= n_iter:
+        while state["i"] < n_iter:
+            
             # Randomizes training data
-            random.shuffle(training_data)
+            # random.shuffle(training_data)
             losses = {}
+
+            # set/update Adam optimizer from state
+            optimizer.learn_rate = state["lr"]
+            optimizer.beta1 = state["beta1"]
+
             # Creates mini batches
             batches = minibatch(training_data, size=32)
 
@@ -360,36 +380,53 @@ class SpacyUtils:
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
-                    drop=DROPOUT_RATE,
+                    drop=0,
                     losses=losses,
                     sgd=optimizer,
                 )
             try:
                 f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
-                # print(f"f-score: {f_score} -  precision: {precision_score} - recall: {recall_score}")
+                
                 numero_losses = losses.get("ner")
-                if numero_losses < best and numero_losses > 0:
-                # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
-                    early_stop = 0
-                    best = numero_losses
-                    best_f_score = f_score
-                    with nlp.use_params(optimizer.averages):
-                        nlp.to_disk(path_best_model)
-                    logger.info(f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}")
-                else:
-                    early_stop += 1
+                # if numero_losses < best and numero_losses > 0:
+                # # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
+                #     early_stop = 0
+                #     best = numero_losses
+                #     best_f_score = f_score
+                #     with nlp.use_params(optimizer.averages):
+                #         nlp.to_disk(path_best_model)
+                #     logger.info(f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}")
+                # else:
+                #     early_stop += 1
 
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            logger.info(f"Losses rate: {losses}, f1-score: {f_score}, precission: {precision_score} early_stop: {early_stop}")
+            
 
             if early_stop >= not_improve:
                 print(f"This batch is not improving enough, stopping training with it")
                 logger.info(f"This batch is not improving enough, stopping training with it")
                 break
 
-            itn += 1
+            # update state history   
+            state["history"]["ner"].append(numero_losses)
+            state["history"]["f_score"].append(f_score)
+            state["history"]["recall"].append(recall_score)
+            state["history"]["precision"].append(precision_score)
+
+            
+
+            # run callbacks    
+            for cb in callbacks:
+                cb(state, logger, nlp, optimizer)
+
+            state["i"] += 1
+            # max and min    
+            state["min_ner"] = min(state["history"]["ner"])
+            state["max_f_score"] = max(state["history"]["f_score"])
+            state["max_recall"] = max(state["history"]["recall"])
+            state["max_precision"] = max(state["history"]["precision"])
 
         return best
 
@@ -451,7 +488,14 @@ class SpacyUtils:
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model)
+
+            callbacks = [
+                print_scores_on_epoch(),
+                save_best_model(path_best_model=path_best_model, threshold=10),
+                early_stop()
+            ]
+
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks)
             
             nlp.to_disk(model_path)
             return best
