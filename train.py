@@ -18,6 +18,7 @@ import srsly
 from os import listdir
 from os.path import isfile, join
 from callbacks import print_scores_on_epoch, save_best_model, reduce_lr_on_plateau, early_stop
+import time
 
 logger = logging.getLogger('Spacy cli util')
 logger.setLevel(logging.DEBUG)
@@ -352,19 +353,22 @@ class SpacyUtils:
                 "f_score": [],
                 "recall": [],
                 "precision": [],
+                "lr": []
             },
             "min_ner": 0,
             "max_f_score": 0,
             "max_recall": 0,
             "max_precision": 0,
-            "lr": 0.004,
-            "beta1": 0.8
+            "lr": 0.008,
+            "beta1": 0.7,
+            "stop": False,
+            #"not_improve": 5
         }
 
-        while state["i"] < n_iter:
-            
+        while not state["stop"] and state["i"] < n_iter:
+            print(state["stop"])
             # Randomizes training data
-            # random.shuffle(training_data)
+            random.shuffle(training_data)
             losses = {}
 
             # set/update Adam optimizer from state
@@ -372,7 +376,7 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=32)
+            batches = minibatch(training_data, size=48)
 
             for batch in batches:
                 texts, annotations = zip(*batch)
@@ -384,6 +388,9 @@ class SpacyUtils:
                     losses=losses,
                     sgd=optimizer,
                 )
+                # ... experimental
+                time.sleep(1)    
+
             try:
                 f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
                 
@@ -414,12 +421,11 @@ class SpacyUtils:
             state["history"]["f_score"].append(f_score)
             state["history"]["recall"].append(recall_score)
             state["history"]["precision"].append(precision_score)
-
-            
+            state["history"]["lr"].append(optimizer.learn_rate)
 
             # run callbacks    
             for cb in callbacks:
-                cb(state, logger, nlp, optimizer)
+                state = cb(state, logger, nlp, optimizer)
 
             state["i"] += 1
             # max and min    
@@ -427,6 +433,9 @@ class SpacyUtils:
             state["max_f_score"] = max(state["history"]["f_score"])
             state["max_recall"] = max(state["history"]["recall"])
             state["max_precision"] = max(state["history"]["precision"])
+
+            # TODO save history csv
+            # TODO log max values
 
         return best
 
@@ -491,8 +500,9 @@ class SpacyUtils:
 
             callbacks = [
                 print_scores_on_epoch(),
-                save_best_model(path_best_model=path_best_model, threshold=10),
-                early_stop()
+                save_best_model(path_best_model=path_best_model, threshold=65),
+                reduce_lr_on_plateau(epochs=3, diff=2),
+                early_stop(epochs=10, diff=15),
             ]
 
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks)
