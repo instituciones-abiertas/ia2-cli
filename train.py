@@ -17,8 +17,8 @@ from spacy.gold import GoldParse, docs_to_json
 import srsly
 from os import listdir
 from os.path import isfile, join
-from callbacks import print_scores_on_epoch, save_best_model, reduce_lr_on_plateau, early_stop
-import time
+from callbacks import (print_scores_on_epoch, save_best_model, reduce_lr_on_plateau,
+    early_stop, update_best_scores, sleep, log_best_scores, save_csv_history)
 
 logger = logging.getLogger('Spacy cli util')
 logger.setLevel(logging.DEBUG)
@@ -348,12 +348,15 @@ class SpacyUtils:
         
         state = {
             "i": 0,
+            "epochs": n_iter,
+            "train_size": len(training_data),
             "history": {
                 "ner": [],
                 "f_score": [],
                 "recall": [],
                 "precision": [],
-                "lr": []
+                "lr": [],
+                "batches": []  # processed batches
             },
             "min_ner": 0,
             "max_f_score": 0,
@@ -361,12 +364,10 @@ class SpacyUtils:
             "max_precision": 0,
             "lr": 0.008,
             "beta1": 0.7,
-            "stop": False,
-            #"not_improve": 5
+            "stop": False
         }
 
         while not state["stop"] and state["i"] < n_iter:
-            print(state["stop"])
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
@@ -376,11 +377,13 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=48)
-
+            batches = minibatch(training_data, size=8)
+            num_batches = 0    
+            
             for batch in batches:
+                num_batches += 1
                 texts, annotations = zip(*batch)
-
+                 
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
@@ -388,12 +391,13 @@ class SpacyUtils:
                     losses=losses,
                     sgd=optimizer,
                 )
-                # ... experimental
-                time.sleep(1)    
 
-            try:
-                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
+                # run batch callbacks
+                for cb in callbacks["on_batch"]:
+                    state = cb(state, logger, nlp, optimizer)
                 
+            try:
+                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)                
                 numero_losses = losses.get("ner")
                 # if numero_losses < best and numero_losses > 0:
                 # # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
@@ -407,9 +411,7 @@ class SpacyUtils:
                 #     early_stop += 1
 
             except Exception:
-                logger.exception("The batch has no training data.")
-
-            
+                logger.exception("The batch has no training data.")            
 
             if early_stop >= not_improve:
                 print(f"This batch is not improving enough, stopping training with it")
@@ -422,20 +424,18 @@ class SpacyUtils:
             state["history"]["recall"].append(recall_score)
             state["history"]["precision"].append(precision_score)
             state["history"]["lr"].append(optimizer.learn_rate)
+            state["history"]["batches"].append(num_batches)
 
-            # run callbacks    
-            for cb in callbacks:
+            # run callbacks after each iteration
+            callbacks["on_iteration"].append(update_best_scores())   
+            for cb in callbacks["on_iteration"]:
                 state = cb(state, logger, nlp, optimizer)
 
             state["i"] += 1
-            # max and min    
-            state["min_ner"] = min(state["history"]["ner"])
-            state["max_f_score"] = max(state["history"]["f_score"])
-            state["max_recall"] = max(state["history"]["recall"])
-            state["max_precision"] = max(state["history"]["precision"])
 
-            # TODO save history csv
-            # TODO log max values
+        # Run callbacks after train loop
+        for cb in callbacks["on_stop"]:
+            state = cb(state, logger, nlp, optimizer)        
 
         return best
 
@@ -498,14 +498,24 @@ class SpacyUtils:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
 
-            callbacks = [
-                print_scores_on_epoch(),
-                save_best_model(path_best_model=path_best_model, threshold=65),
-                reduce_lr_on_plateau(epochs=3, diff=2),
-                early_stop(epochs=10, diff=15),
-            ]
+            # adding plugins for each step of train loop train loop
+            callbacks = {
+                "on_batch": [sleep(secs=2)],
+                "on_iteration": [
+                    
+                    print_scores_on_epoch(),
+                    save_best_model(path_best_model=path_best_model, threshold=max_losses),
+                    reduce_lr_on_plateau(epochs=3, diff=1, step=0.001),
+                    early_stop(epochs=10, diff=2),
+                    sleep(secs=3, log=True)
+                ],
+                "on_stop":[
+                    log_best_scores(),
+                    save_csv_history()
+                ]
+            }
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks)
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data[:40], best, path_best_model, callbacks)
             
             nlp.to_disk(model_path)
             return best

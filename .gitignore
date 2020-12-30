@@ -4,6 +4,7 @@
 # Training and Output data
 data
 output
+history
 
 # Spacy Models
 models
