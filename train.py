@@ -377,7 +377,7 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=8)
+            batches = minibatch(training_data, size=12)
             num_batches = 0    
             
             for batch in batches:
@@ -500,7 +500,7 @@ class SpacyUtils:
 
             # adding plugins for each step of train loop train loop
             callbacks = {
-                "on_batch": [sleep(secs=2)],
+                "on_batch": [sleep(secs=1)],
                 "on_iteration": [
                     
                     print_scores_on_epoch(),
@@ -515,7 +515,7 @@ class SpacyUtils:
                 ]
             }
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data[:40], best, path_best_model, callbacks)
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks)
             
             nlp.to_disk(model_path)
             return best

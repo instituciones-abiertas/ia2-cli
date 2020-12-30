@@ -1,6 +1,9 @@
 import numpy as np
 np.set_printoptions(formatter={'float': lambda x: "{0:0.2f}".format(x)})
 import time
+from datetime import datetime
+import csv
+import os
 
 # example of callback structure
 def example(param="value"):
@@ -147,7 +150,8 @@ def log_best_scores():
   TODO add validation scores
   """
   def log_best_scores_cb(state, logger, model, optimizer):
-    logger.info("\n\n-------🏆-BEST-SCORES-🏅----------")
+    logger.info("\n\n")
+    logger.info("-------🏆-BEST-SCORES-🏅----------")
     e = state["i"] + 1
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
     logger.info(f"NER -> min {state['min_ner']} | val min 👷‍♀️")
@@ -160,11 +164,53 @@ def log_best_scores():
   return log_best_scores_cb
 
 
-def save_csv_history(file="history.csv", session=""):
+def save_csv_history(filename="history.csv", session=""):
   """
   Save history values to csv file
+
   """
   def save_csv_history_cb(state, logger, model, optimizer):
+    path = f"history/{filename}"
+    logger.info("\n\n")
+    logger.info(f"[save_csv_history] 💾 Saving history in a {path} file")
+    # create file if not exisys
+    if not os.path.exists(path):
+      with open(path, 'w'): pass
+
+    # give a session name if not given
+    if session == "":
+      now = datetime.now()
+      s = now.strftime("%d/%m/%Y %H:%M:%S")      
+    else:
+      s = session
+
+    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision"]
+    rows = []
+
+    #prepare the rows
+    logger.info(f"\n[save_csv_history] preparing rows ...")
+    for i in range(len(state["history"]["ner"])):
+      rows.append({
+        "session": s,
+        "epoch": i+1,
+        "batches": state["history"]["batches"][i],
+        "lr": state["history"]["lr"][i],
+        "ner": state["history"]["ner"][i],
+        "f_score": state["history"]["f_score"][i],
+        "recall": state["history"]["recall"][i],
+        "precision": state["history"]["precision"][i],
+      })
+
+    # opening the csv file in 'w' mode 
+    file = open(path, 'w', newline ='')
+    with file:
+      writer = csv.DictWriter(file, fieldnames = header)
+      writer.writeheader()
+      for r in rows:
+        writer.writerow(r)
+
+    logger.info(f"[save_csv_history] 💾 saved!! {path} file")
+
     return state
 
   return save_csv_history_cb
