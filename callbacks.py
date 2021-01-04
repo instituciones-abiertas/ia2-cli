@@ -27,11 +27,14 @@ def print_scores_on_epoch():
     ner = state["history"]["ner"][-1]
     f_score = state["history"]["f_score"][-1]
     precision_score = state["history"]["precision"][-1]
+    val_f_score = state["history"]["val_f_score"][-1]
+    val_precision_score = state["history"]["val_precision"][-1]
     batches = state["history"]["batches"][-1]
 
     logger.info("......................................................................")
     logger.info(f" Epoch N° {e}/{state['epochs']} | batches processed: {batches}")
     logger.info(f"Losses rate: ner:{ner}, f1-score: {f_score}, precision: {precision_score}")
+    logger.info(f"Validation Losses rate: f1-score: {val_f_score}, precision: {val_precision_score}")
 
     return state
 
@@ -123,6 +126,9 @@ def update_best_scores():
     state["max_f_score"] = max(state["history"]["f_score"])
     state["max_recall"] = max(state["history"]["recall"])
     state["max_precision"] = max(state["history"]["precision"])
+    state["max_val_f_score"] = max(state["history"]["val_f_score"])
+    state["max_val_recall"] = max(state["history"]["val_recall"])
+    state["max_val_precision"] = max(state["history"]["val_precision"])
     return state
 
   return update_best_scores_cb
@@ -152,12 +158,12 @@ def log_best_scores():
   def log_best_scores_cb(state, logger, model, optimizer):
     logger.info("\n\n")
     logger.info("-------🏆-BEST-SCORES-🏅----------")
-    e = state["i"] + 1
+    e = state["i"]
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
-    logger.info(f"NER -> min {state['min_ner']} | val min 👷‍♀️")
-    logger.info(f"RECALL -> max {state['max_recall']} | val max 👷")
-    logger.info(f"PRECISION -> max {state['max_precision']} | val max 🏗")
-    logger.info(f"F-SCORE -> max {state['max_f_score']} | val max 🚧")
+    logger.info(f"NER -> min {state['min_ner']}")
+    logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
+    logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
+    logger.info(f"F-SCORE -> max {state['max_f_score']} | val max {state['max_val_f_score']}")
     
     return state
 
@@ -167,7 +173,8 @@ def log_best_scores():
 def save_csv_history(filename="history.csv", session=""):
   """
   Save history values to csv file
-
+  :param filename file where to write the csv rows
+  :param session session id. If blank a date string is used in each call
   """
   def save_csv_history_cb(state, logger, model, optimizer):
     path = f"history/{filename}"
@@ -180,11 +187,12 @@ def save_csv_history(filename="history.csv", session=""):
     # give a session name if not given
     if session == "":
       now = datetime.now()
-      s = now.strftime("%d/%m/%Y %H:%M:%S")      
+      s = now.strftime("%Y%m%d%H%M%S")      
     else:
       s = session
 
-    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision"]
+    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision",
+     "val_f_score", "val_recall", "val_precision"]
     rows = []
 
     #prepare the rows
@@ -199,6 +207,9 @@ def save_csv_history(filename="history.csv", session=""):
         "f_score": state["history"]["f_score"][i],
         "recall": state["history"]["recall"][i],
         "precision": state["history"]["precision"][i],
+        "val_f_score": state["history"]["val_f_score"][i],
+        "val_recall": state["history"]["val_recall"][i],
+        "val_precision": state["history"]["val_precision"][i],
       })
 
     # opening the csv file in 'w' mode 

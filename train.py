@@ -341,7 +341,7 @@ class SpacyUtils:
 
         return best
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks = []):
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks= []):
         #best_f_score = 0
         early_stop = 0
         not_improve = 30
@@ -355,6 +355,9 @@ class SpacyUtils:
                 "f_score": [],
                 "recall": [],
                 "precision": [],
+                "val_f_score": [],
+                "val_recall": [],
+                "val_precision": [],
                 "lr": [],
                 "batches": []  # processed batches
             },
@@ -362,6 +365,9 @@ class SpacyUtils:
             "max_f_score": 0,
             "max_recall": 0,
             "max_precision": 0,
+            "max_val_f_score": 0,
+            "max_val_recall": 0,
+            "max_val_precision": 0,
             "lr": 0.008,
             "beta1": 0.7,
             "stop": False
@@ -397,18 +403,13 @@ class SpacyUtils:
                     state = cb(state, logger, nlp, optimizer)
                 
             try:
+                # compute validation scores
+                val_texts, val_annotations = zip(*validation_data)
+                val_f_score, val_precision_score, val_recall_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
+                
                 f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)                
                 numero_losses = losses.get("ner")
-                # if numero_losses < best and numero_losses > 0:
-                # # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
-                #     early_stop = 0
-                #     best = numero_losses
-                #     best_f_score = f_score
-                #     with nlp.use_params(optimizer.averages):
-                #         nlp.to_disk(path_best_model)
-                #     logger.info(f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}")
-                # else:
-                #     early_stop += 1
+                
 
             except Exception:
                 logger.exception("The batch has no training data.")            
@@ -423,6 +424,12 @@ class SpacyUtils:
             state["history"]["f_score"].append(f_score)
             state["history"]["recall"].append(recall_score)
             state["history"]["precision"].append(precision_score)
+
+            #validation
+            state["history"]["val_f_score"].append(val_f_score)
+            state["history"]["val_recall"].append(val_recall_score)
+            state["history"]["val_precision"].append(val_precision_score)
+
             state["history"]["lr"].append(optimizer.learn_rate)
             state["history"]["batches"].append(num_batches)
 
@@ -447,7 +454,8 @@ class SpacyUtils:
         ents: list,
         path_best_model: str,
         max_losses: float,
-        is_raw: bool = True
+        is_raw: bool =True,
+        path_data_validation: str =""
     ):
         """
         Given a dataturks .json format input file, a list of entities and a path
@@ -473,10 +481,18 @@ class SpacyUtils:
         if is_raw:
             logger.info(f"loading and converting training data from dataturks: {path_data_training}")
             training_data = convert_dataturks_to_spacy(path_data_training, ents)
+            if path_data_validation != "":
+                validation_data = convert_dataturks_to_spacy(path_data_training, ents)
         else:
             logger.info(f"loading pre-converted training data JSON: {path_data_training}")
             with open(path_data_training) as f:
                 training_data = json.load(f)
+            
+            if path_data_validation != "":
+                logger.info(f"loading pre-converted validation data JSON: {path_data_validation}")
+                with open(path_data_validation) as f:
+                    validation_data = json.load(f)
+                     
         
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
@@ -492,6 +508,11 @@ class SpacyUtils:
         for _, annotations in training_data:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
+
+        # if path_data_validation != "":
+        #     for _, val_annotations in validation_data:
+        #         for ent in annotations.get("entities"):
+        #             ner.add_label(ent[2])
 
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
@@ -515,7 +536,7 @@ class SpacyUtils:
                 ]
             }
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, callbacks)
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data[:2], best, path_best_model, validation_data=validation_data, callbacks=callbacks)
             
             nlp.to_disk(model_path)
             return best
