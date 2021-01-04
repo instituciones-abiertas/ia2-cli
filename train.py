@@ -368,8 +368,8 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": 0.008,
-            "beta1": 0.7,
+            "lr": 0.004,
+            "beta1": 0.8,
             "stop": False
         }
 
@@ -383,7 +383,7 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=12)
+            batches = minibatch(training_data, size=4)
             num_batches = 0    
             
             for batch in batches:
@@ -536,7 +536,7 @@ class SpacyUtils:
                 ]
             }
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data[:2], best, path_best_model, validation_data=validation_data, callbacks=callbacks)
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks)
             
             nlp.to_disk(model_path)
             return best
