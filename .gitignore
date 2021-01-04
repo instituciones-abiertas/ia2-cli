@@ -11,8 +11,5 @@ models
 # Misc
 __pycache__
 
-# Logs
-logs
-
 # Virtualenv
 /venv
