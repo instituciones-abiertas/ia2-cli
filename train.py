@@ -373,6 +373,10 @@ class SpacyUtils:
             "stop": False
         }
 
+        # for validation    
+        val_texts, val_annotations = zip(*validation_data)
+        tr_texts, tr_annotations = zip(*training_data)
+
         while not state["stop"] and state["i"] < n_iter:
             # Randomizes training data
             random.shuffle(training_data)
@@ -404,10 +408,10 @@ class SpacyUtils:
                 
             try:
                 # compute validation scores
-                val_texts, val_annotations = zip(*validation_data)
                 val_f_score, val_precision_score, val_recall_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
                 
-                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)                
+                # train data score
+                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)                
                 numero_losses = losses.get("ner")
                 
 
@@ -521,7 +525,7 @@ class SpacyUtils:
 
             # adding plugins for each step of train loop train loop
             callbacks = {
-                "on_batch": [sleep(secs=1)],
+                "on_batch": [sleep(secs=2)],
                 "on_iteration": [
                     
                     print_scores_on_epoch(),
