@@ -82,7 +82,8 @@ def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last
           logger.info(f"[reduce_lr_on_plateau] Positive rate 🛫! waiting a bit more until touch learning rate")
         else:
           state["lr"] -= step
-          logger.info(f"[reduce_lr_on_plateau] Not learning then reduce learn rate to {state['lr']}")
+          state["epochs"] += 1  #CHECK! we add 1 epoch for each decrementation of the LR
+          logger.info(f"[reduce_lr_on_plateau] Not learning then reduce learn rate to {state['lr']} and epochs to {state['epochs']}")
 
     return state
 
@@ -160,6 +161,7 @@ def log_best_scores():
     logger.info("-------🏆-BEST-SCORES-🏅----------")
     e = state["i"]
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
+    logger.info(f"elapsed time: {state['elapsed_time']} minutes")
     logger.info(f"NER -> min {state['min_ner']}")
     logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
     logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")

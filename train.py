@@ -10,6 +10,7 @@ import re
 import sys
 import subprocess
 import spacy
+import time
 from spacy.util import minibatch, compounding, filter_spans, decaying
 from spacy.gold import biluo_tags_from_offsets
 from spacy.scorer import Scorer
@@ -341,10 +342,23 @@ class SpacyUtils:
 
         return best
 
+    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, val_f_score, val_recall_score, val_precision_score, learn_rate, num_batches):
+        state["history"]["ner"].append(numero_losses)
+        state["history"]["f_score"].append(f_score)
+        state["history"]["recall"].append(recall_score)
+        state["history"]["precision"].append(precision_score)
+
+        #validation
+        state["history"]["val_f_score"].append(val_f_score)
+        state["history"]["val_recall"].append(val_recall_score)
+        state["history"]["val_precision"].append(val_precision_score)
+
+        state["history"]["lr"].append(learn_rate)
+        state["history"]["batches"].append(num_batches)        
+
+
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks= []):
-        #best_f_score = 0
-        early_stop = 0
-        not_improve = 30
+        init_time = time.clock()
         
         state = {
             "i": 0,
@@ -370,6 +384,7 @@ class SpacyUtils:
             "max_val_precision": 0,
             "lr": 0.004,
             "beta1": 0.8,
+            "elapsed_time": 0,
             "stop": False
         }
 
@@ -377,7 +392,7 @@ class SpacyUtils:
         val_texts, val_annotations = zip(*validation_data)
         tr_texts, tr_annotations = zip(*training_data)
 
-        while not state["stop"] and state["i"] < n_iter:
+        while not state["stop"] and state["i"] < state["epochs"]:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
@@ -393,11 +408,11 @@ class SpacyUtils:
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
-                 
+
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
-                    drop=0,
+                    drop=0,  #TODO we are trying to overfit the model! we should change it once we've found a good model
                     losses=losses,
                     sgd=optimizer,
                 )
@@ -416,26 +431,9 @@ class SpacyUtils:
                 
 
             except Exception:
-                logger.exception("The batch has no training data.")            
+                logger.exception("The batch has no training data.")
 
-            if early_stop >= not_improve:
-                print(f"This batch is not improving enough, stopping training with it")
-                logger.info(f"This batch is not improving enough, stopping training with it")
-                break
-
-            # update state history   
-            state["history"]["ner"].append(numero_losses)
-            state["history"]["f_score"].append(f_score)
-            state["history"]["recall"].append(recall_score)
-            state["history"]["precision"].append(precision_score)
-
-            #validation
-            state["history"]["val_f_score"].append(val_f_score)
-            state["history"]["val_recall"].append(val_recall_score)
-            state["history"]["val_precision"].append(val_precision_score)
-
-            state["history"]["lr"].append(optimizer.learn_rate)
-            state["history"]["batches"].append(num_batches)
+            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, val_f_score, val_recall_score, val_precision_score, optimizer.learn_rate, num_batches)
 
             # run callbacks after each iteration
             callbacks["on_iteration"].append(update_best_scores())   
@@ -445,6 +443,8 @@ class SpacyUtils:
             state["i"] += 1
 
         # Run callbacks after train loop
+        end_time = time.clock()
+        state["elapsed_time"] = (end_time - init_time) / 60
         for cb in callbacks["on_stop"]:
             state = cb(state, logger, nlp, optimizer)        
 
@@ -571,6 +571,11 @@ class SpacyUtils:
         :param max_losses: A float representing the maximum NER losses value
         to consider before start writing best models output.  
         """
+
+        # FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
+        # de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
+        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
+        
         begin_time = datetime.datetime.now()
         onlyfiles = [
             f
@@ -579,11 +584,7 @@ class SpacyUtils:
         ]
         random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
-        # FIXME NO le damos bola al max_losses que viene por parámetro, sino a la mejora en losses
-        # se debería considerar refactorizar la forma en que iteramos => n_iter, files, minibatches
-        # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo, 
-        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-        best_losses = 300 #max_losses
+        best_losses = max_losses
         processed_docs = 0
         for file_name in onlyfiles:
             logger.info(f"Started processing file at \"{file_name}\"...")
