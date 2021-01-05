@@ -525,7 +525,7 @@ class SpacyUtils:
 
             # adding plugins for each step of train loop train loop
             callbacks = {
-                "on_batch": [sleep(secs=2)],
+                "on_batch": [sleep(secs=1)],
                 "on_iteration": [
                     
                     print_scores_on_epoch(),

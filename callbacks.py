@@ -41,7 +41,7 @@ def print_scores_on_epoch():
   return print_scores_cb
 
 
-def save_best_model(path_best_model="", threshold=70, score="f_score"):
+def save_best_model(path_best_model="", threshold=70, score="val_f_score"):
   """
   Save the model if the epoch score is more than the threshold
   and if current score is a new max 
@@ -60,7 +60,7 @@ def save_best_model(path_best_model="", threshold=70, score="f_score"):
   return save_best_model_cb
 
 
-def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="f_score", last_chance=True):
+def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last_chance=True):
   """
   Whe the model is not getting better scores (plateau or decrease)
   from the selected amount of last epochs this function sets the
@@ -89,7 +89,7 @@ def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="f_score", last_cha
   return reduce_lr_on_plateau_cb
 
 
-def early_stop(epochs=10, score="f_score", diff=5, last_chance=True):
+def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
   """
   Sets the stop value to True in state if score is not improving during the last epochs
   Note: Uses the average of last scores
