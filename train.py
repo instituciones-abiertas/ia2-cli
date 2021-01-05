@@ -530,6 +530,35 @@ class SpacyUtils:
             all_entities[entity] = entity_length
         logger.info(f"Total entities output: {all_entities}")
 
+
+    def show_text(self, files_path: str, entity: str):
+        """
+        Given the path to a dataturks .json format input file directory and an
+        entity name, prints the annotation text from label.
+
+        :param files_path: Directory pointing to dataturks .json files
+        :param entity: entity label name.
+        """
+        files = [
+            os.path.join(files_path, f)
+            for f in listdir(files_path)
+            if isfile(join(files_path, f))
+        ]
+        texts = []
+
+        for file_ in files:
+            with open(file_, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    data = json.loads(line)
+                    for a in data["annotation"] or []:
+                        if a["label"][0] == entity:
+                            if not a["points"][0]["text"] in texts:
+                                texts.append(a["points"][0]["text"])
+        for text in texts:
+            print(text)
+
+
     def run_command_with_timer(self,*args):
         """
         Calculate the time spend to run command
