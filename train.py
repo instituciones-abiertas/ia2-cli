@@ -373,6 +373,9 @@ class SpacyUtils:
             "stop": False
         }
 
+        # callback 
+        # callbacks["on_iteration"].append(update_best_scores())
+
         # for validation    
         val_texts, val_annotations = zip(*validation_data)
         tr_texts, tr_annotations = zip(*training_data)
@@ -438,7 +441,7 @@ class SpacyUtils:
             state["history"]["batches"].append(num_batches)
 
             # run callbacks after each iteration
-            callbacks["on_iteration"].append(update_best_scores())   
+               
             for cb in callbacks["on_iteration"]:
                 state = cb(state, logger, nlp, optimizer)
 
@@ -450,6 +453,64 @@ class SpacyUtils:
 
         return best
 
+    def train(self, config: str):
+        """
+        Runs the train_model method using the selected configuration from train_config.json
+        :param config the train configuration name
+        """
+        FUNC_MAP = {
+            "save_best_model": save_best_model, 
+            "reduce_lr_on_plateau": reduce_lr_on_plateau,
+            "early_stop": early_stop, 
+            "update_best_scores": update_best_scores, 
+            "log_best_scores": log_best_scores,
+            "save_csv_history": save_csv_history,
+            "sleep": sleep,
+            "print_scores_on_epoch": print_scores_on_epoch,
+
+        }
+        try:
+            with open("train_config.json") as f:
+                train_config = json.load(f)
+                train_config = train_config[config]
+                
+            on_iter_cb = []
+            for cb in train_config["callbacks"]["on_iteration"]:
+                on_iter_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+
+            on_batch_cb = []
+            for cb in train_config["callbacks"]["on_batch"]:
+                on_batch_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+
+            on_stop_cb = []
+            for cb in train_config["callbacks"]["on_stop"]:
+                on_stop_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+                
+            callbacks = {
+                "on_iteration": on_iter_cb,
+                "on_batch": on_batch_cb,
+                "on_stop": on_stop_cb
+            }
+            
+            
+        except Exception as e:
+            print(e)       
+
+        print(f"Training with {config} configuration")
+        
+        return self.train_model(        
+                train_config["path_data_training"],
+                train_config["epochs"],
+                train_config["model_path"],
+                train_config["entities"],
+                train_config["save_model_path"],
+                train_config["threshold"],
+                train_config["is_raw"],
+                train_config["path_data_validation"],
+                callbacks=callbacks,
+                train_subset=train_config["train_subset"]
+            )  
+
     def train_model(
         self,
         path_data_training: str,
@@ -459,7 +520,9 @@ class SpacyUtils:
         path_best_model: str,
         max_losses: float,
         is_raw: bool =True,
-        path_data_validation: str =""
+        path_data_validation: str ="",
+        callbacks={},
+        train_subset=0
     ):
         """
         Given a dataturks .json format input file, a list of entities and a path
@@ -524,21 +587,26 @@ class SpacyUtils:
             optimizer = nlp.begin_training()
 
             # adding plugins for each step of train loop train loop
-            callbacks = {
-                "on_batch": [sleep(secs=1)],
-                "on_iteration": [
-                    
-                    print_scores_on_epoch(),
-                    save_best_model(path_best_model=path_best_model, threshold=max_losses),
-                    reduce_lr_on_plateau(epochs=3, diff=1, step=0.001),
-                    early_stop(epochs=10, diff=2),
-                    sleep(secs=3, log=True)
-                ],
-                "on_stop":[
-                    log_best_scores(),
-                    save_csv_history()
-                ]
-            }
+            # these are default callbacks
+            if not bool(callbacks):
+                callbacks = {
+                    "on_batch": [sleep(secs=1)],
+                    "on_iteration": [
+                        
+                        print_scores_on_epoch(),
+                        save_best_model(path_best_model=path_best_model, threshold=max_losses),
+                        reduce_lr_on_plateau(epochs=3, diff=1, step=0.001),
+                        early_stop(epochs=10, diff=2),
+                        update_best_scores(),
+                        sleep(secs=3, log=True)
+                    ],
+                    "on_stop":[
+                        log_best_scores(),
+                        save_csv_history()
+                    ]
+                }
+            if train_subset > 0:
+                training_data = training_data[:train_subset]
 
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks)
             

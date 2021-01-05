@@ -6,6 +6,8 @@ data
 output
 history
 
+train_config.json
+
 # Spacy Models
 models
 
