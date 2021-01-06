@@ -9,6 +9,9 @@
     "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
     "threshold": 80,
     "epochs": 20,
+    "optimizer": {"lr": 0.05},
+    "dropout": 0.25,
+    "batch_size":{"f": "compounding", "from": 6.0, "to": 12.0, "rate": 1.5},
     "callbacks": {
       "on_iteration":[
         {"f": "print_scores_on_epoch"},
@@ -36,6 +39,9 @@
     "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
     "threshold": "80",
     "epochs": 40,
+    "optimizer": {},
+    "dropout": {},
+    "batch_size":{},
     "callbacks": {
       "on_iteration":[
         {"f": "print_scores_on_epoch"},
