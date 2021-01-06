@@ -359,9 +359,26 @@ class SpacyUtils:
         state["history"]["batches"].append(num_batches)        
 
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks= []):
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks={}, settings={}):
         init_time = time.clock()
+        print("\nsettings", settings)
         
+        # Adam settings and defaults
+        if bool(settings["optimizer"]):
+            
+            if "lr" in settings["optimizer"]:
+                lr = settings["optimizer"]["lr"]
+            else:
+                lr = 0.004
+            
+            if "beta1" in settings["optimizer"]:
+                beta1 = settings["optimizer"]["beta1"]
+            else:
+                beta1 = 0.9
+        else:
+            lr = 0.004
+            beta1 = 0.9 
+
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -386,11 +403,13 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": 0.0004,
-            "beta1": 0.8,
+            "lr": lr,
+            "beta1": beta1,
             "elapsed_time": 0,
             "stop": False
         }
+
+        print(state)
 
         # callback 
         # callbacks["on_iteration"].append(update_best_scores())
@@ -470,13 +489,29 @@ class SpacyUtils:
             "save_csv_history": save_csv_history,
             "sleep": sleep,
             "print_scores_on_epoch": print_scores_on_epoch,
-
+            # spacy funcs
+            "compounding": compounding,
+            "decaying": decaying
         }
         try:
             with open("train_config.json") as f:
                 train_config = json.load(f)
                 train_config = train_config[config]
+
+            # train settings
+            if not "optimizer" in train_config:
+                opt = {}
+            else:
+                opt = train_config["optimizer"]
+
+            #if type(myVariable) == int or type(myVariable) == float:
+            
+
+            settings = {
+                "optimizer": opt,
                 
+            }
+
             on_iter_cb = []
             for cb in train_config["callbacks"]["on_iteration"]:
                 on_iter_cb.append(FUNC_MAP[cb.pop("f")](**cb))
@@ -511,6 +546,7 @@ class SpacyUtils:
                 train_config["is_raw"],
                 train_config["path_data_validation"],
                 callbacks=callbacks,
+                settings=settings,
                 train_subset=train_config["train_subset"]
             )  
 
@@ -525,6 +561,7 @@ class SpacyUtils:
         is_raw: bool =True,
         path_data_validation: str ="",
         callbacks={},
+        settings={},
         train_subset=0
     ):
         """
@@ -611,8 +648,8 @@ class SpacyUtils:
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks)
-            #TODO no deberíamos guardar el modelo si ya se guardó alguno
+            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
+            
             nlp.to_disk(model_path)
             return best
 
