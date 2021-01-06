@@ -193,8 +193,8 @@ def save_csv_history(filename="history.csv", session=""):
     else:
       s = session
 
-    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision",
-     "val_f_score", "val_recall", "val_precision"]
+    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision", "per_type_score",
+     "val_f_score", "val_recall", "val_precision", "val_per_type_score"]
     rows = []
 
     #prepare the rows
@@ -209,9 +209,11 @@ def save_csv_history(filename="history.csv", session=""):
         "f_score": state["history"]["f_score"][i],
         "recall": state["history"]["recall"][i],
         "precision": state["history"]["precision"][i],
+        "per_type_score": state["history"]["per_type_score"][i],
         "val_f_score": state["history"]["val_f_score"][i],
         "val_recall": state["history"]["val_recall"][i],
         "val_precision": state["history"]["val_precision"][i],
+        "val_per_type_score": state["history"]["val_per_type_score"][i],
       })
 
     # opening the csv file in 'w' mode 

@@ -342,16 +342,18 @@ class SpacyUtils:
 
         return best
 
-    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, val_f_score, val_recall_score, val_precision_score, learn_rate, num_batches):
+    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches):
         state["history"]["ner"].append(numero_losses)
         state["history"]["f_score"].append(f_score)
         state["history"]["recall"].append(recall_score)
         state["history"]["precision"].append(precision_score)
+        state["history"]["per_type_score"].append(per_type_score)
 
         #validation
         state["history"]["val_f_score"].append(val_f_score)
         state["history"]["val_recall"].append(val_recall_score)
         state["history"]["val_precision"].append(val_precision_score)
+        state["history"]["val_per_type_score"].append(per_type_score)
 
         state["history"]["lr"].append(learn_rate)
         state["history"]["batches"].append(num_batches)        
@@ -369,9 +371,11 @@ class SpacyUtils:
                 "f_score": [],
                 "recall": [],
                 "precision": [],
+                "per_type_score": [],
                 "val_f_score": [],
                 "val_recall": [],
                 "val_precision": [],
+                "val_per_type_score": [],
                 "lr": [],
                 "batches": []  # processed batches
             },
@@ -382,7 +386,7 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": 0.004,
+            "lr": 0.0004,
             "beta1": 0.8,
             "elapsed_time": 0,
             "stop": False
@@ -426,17 +430,16 @@ class SpacyUtils:
                 
             try:
                 # compute validation scores
-                val_f_score, val_precision_score, val_recall_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
+                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
                 
                 # train data score
-                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)                
+                f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)                
                 numero_losses = losses.get("ner")
-                
 
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, val_f_score, val_recall_score, val_precision_score, optimizer.learn_rate, num_batches)
+            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, optimizer.learn_rate, num_batches)
 
             # run callbacks after each iteration
                
@@ -609,7 +612,7 @@ class SpacyUtils:
                 training_data = training_data[:train_subset]
 
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks)
-            
+            #TODO no deberíamos guardar el modelo si ya se guardó alguno
             nlp.to_disk(model_path)
             return best
 
@@ -713,6 +716,8 @@ class SpacyUtils:
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
+        per_type_sum = 0
+        ents_per_type_sum = {}
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
@@ -721,8 +726,17 @@ class SpacyUtils:
                 recall_score_sum += scores.get('ents_r')
                 precision_score_sum += scores.get('ents_p')
                 f_score_sum += scores.get('ents_f')
-        #we are returning this 3 values to verify how the model goes
-        return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts)
+
+                for key, value in scores['ents_per_type'].items():
+                    if key not in ents_per_type_sum:
+                        ents_per_type_sum[key] = value['f']
+                    else:
+                        ents_per_type_sum[key] += value['f']
+
+        for key, value in ents_per_type_sum.items():
+            ents_per_type_sum[key] = value / len(texts)
+        
+        return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts), ents_per_type_sum
 
     def count_examples(self, files_path: str, entities: list):
         """
