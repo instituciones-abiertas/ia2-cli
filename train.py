@@ -498,13 +498,31 @@ class SpacyUtils:
                 else:
                     beta1 = 0.9
 
-            #if type(myVariable) == int or type(myVariable) == float:
+            # the dropout
+            if not "dropout" in train_config:
+                dropout = 0.2
+            else:   
+                if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
+                    dropout = train_config["dropout"]
+                else:
+                    d = train_config["dropout"]
+                    dropout = FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
+            
+            # the batch size
+            if not "batch_size" in train_config:
+                batch_size = 4
+            else:   
+                if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
+                    batch_size = train_config["batch_size"]
+                else:
+                    b = train_config["batch_size"]
+                    batch_size = FUNC_MAP[b.pop("f")](b["from"], b["to"], b["rate"])         
 
             settings = {
                 "lr": lr,
                 "beta1": beta1,
-                "dropout": 0.3,
-                "batch_size": compounding(10., 32, 1.8)
+                "dropout": dropout,
+                "batch_size": batch_size
             }
 
             on_iter_cb = []
@@ -575,8 +593,7 @@ class SpacyUtils:
         trained model.  
         :param max_losses: A float representing the maximum NER losses value
         to consider before start writing best models output.
-        :param is_raw A boolean that determines if the train file will be converted.
-        True by default
+        :param is_raw A boolean that determines if the train file will be converteb        True by default
         """
         best = max_losses
 
@@ -611,11 +628,7 @@ class SpacyUtils:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
 
-        # if path_data_validation != "":
-        #     for _, val_annotations in validation_data:
-        #         for ent in annotations.get("entities"):
-        #             ner.add_label(ent[2])
-
+        
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
