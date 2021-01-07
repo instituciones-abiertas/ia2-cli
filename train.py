@@ -360,7 +360,7 @@ class SpacyUtils:
 
 
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks={}, settings={}):
-        init_time = time.clock()
+        init_time = datetime.datetime.now()
         print("\nsettings", settings)
         
         state = {
@@ -452,8 +452,7 @@ class SpacyUtils:
             state["i"] += 1
 
         # Run callbacks after train loop
-        end_time = time.clock()
-        state["elapsed_time"] = (end_time - init_time) / 60
+        state["elapsed_time"] = (datetime.datetime.now() - init_time)
         for cb in callbacks["on_stop"]:
             state = cb(state, logger, nlp, optimizer)        
 
@@ -648,7 +647,7 @@ class SpacyUtils:
                 training_data = training_data[:train_subset]
 
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
-            
+            #TODO deberíamos guardar el primero y actualizar si hay un mejor modelo
             nlp.to_disk(model_path)
             return best
 

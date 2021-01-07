@@ -48,7 +48,7 @@ def save_best_model(path_best_model="", threshold=70, score="val_f_score"):
   """
   def save_best_model_cb(state, logger, model, optimizer):
     # print("last f1: ", state["history"][score][-1], " | max: ", state["max_"+score])
-    
+    #TODO deberíamos darle bola al treshold? o solo guardar cuando el modelo es mejor que el max_score?
     if (state["history"][score][-1] > threshold)  and  (state["history"][score][-1] > state["max_"+score]):
         e = state["i"]+1
         with model.use_params(optimizer.averages):
@@ -161,7 +161,7 @@ def log_best_scores():
     logger.info("-------🏆-BEST-SCORES-🏅----------")
     e = state["i"]
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
-    logger.info(f"elapsed time: {state['elapsed_time']} minutes")
+    logger.info(f"elapsed time: {state['elapsed_time']}")
     logger.info(f"NER -> min {state['min_ner']}")
     logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
     logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
