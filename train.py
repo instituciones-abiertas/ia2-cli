@@ -318,29 +318,30 @@ class SpacyUtils:
     # Model Training functions
     # =================================
 
-    def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
-        for batch in batches:
-            texts, annotations = zip(*batch)
+#FIXME no se está usando esta función
+    # def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
+        # for batch in batches:
+            # texts, annotations = zip(*batch)
 
-            nlp.update(
-                texts, # batch of raw texts
-                annotations, # batch of annotations
-                drop=DROPOUT_RATE,
-                losses=losses,
-                sgd=optimizer,
-            )
-        logger.info(f"⬇️ Losses rate: [{losses}]")
-        try:
-            numero_losses = losses.get("ner")
-            if numero_losses < best and numero_losses > 0:
-                best = numero_losses
-                nlp.to_disk(path_best_model)
-                logger.info(f"💾 Saving model with losses: [{best}]")
+            # nlp.update(
+                # texts, # batch of raw texts
+                # annotations, # batch of annotations
+                # drop=DROPOUT_RATE,
+                # losses=losses,
+                # sgd=optimizer,
+            # )
+        # logger.info(f"⬇️ Losses rate: [{losses}]")
+        # try:
+            # numero_losses = losses.get("ner")
+            # if numero_losses < best and numero_losses > 0:
+                # best = numero_losses
+                # nlp.to_disk(path_best_model)
+                # logger.info(f"💾 Saving model with losses: [{best}]")
 
-        except Exception:
-            logger.exception("The batch has no training data.")
+        # except Exception:
+            # logger.exception("The batch has no training data.")
 
-        return best
+        # return best
 
     def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches):
         state["history"]["ner"].append(numero_losses)
@@ -359,8 +360,8 @@ class SpacyUtils:
         state["history"]["batches"].append(num_batches)        
 
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks={}, settings={}):
-        init_time = datetime.datetime.now()
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}):
+        init_time = time.time()
         print("\nsettings", settings)
         
         # Adam settings and defaults
@@ -468,11 +469,10 @@ class SpacyUtils:
             state["i"] += 1
 
         # Run callbacks after train loop
-        state["elapsed_time"] = (datetime.datetime.now() - init_time)
+        state["elapsed_time"] = (time.time() - init_time)/60
         for cb in callbacks["on_stop"]:
-            state = cb(state, logger, nlp, optimizer)        
+            state = cb(state, logger, nlp, optimizer)
 
-        return best
 
     def train(self, config: str):
         """
@@ -582,7 +582,6 @@ class SpacyUtils:
         :param is_raw A boolean that determines if the train file will be converted.
         True by default
         """
-        best = max_losses
 
         if is_raw:
             logger.info(f"loading and converting training data from dataturks: {path_data_training}")
@@ -625,6 +624,10 @@ class SpacyUtils:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
 
+            # we save the first model and then we update it if there is a better version of it
+            logger.info(f"💾 Saving initial model")
+            nlp.to_disk(model_path)
+
             # adding plugins for each step of train loop train loop
             # these are default callbacks
             if not bool(callbacks):
@@ -647,68 +650,66 @@ class SpacyUtils:
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
-            #TODO deberíamos guardar el primero y actualizar si hay un mejor modelo
-            nlp.to_disk(model_path)
-            return best
+            self.get_best_model(optimizer, nlp, n_iter, training_data, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
 
-    def train_all_files_in_folder(
-        self,
-        training_files_path: str,
-        n_iter: int,
-        model_path: str,
-        entities: list,
-        best_model_path: str,
-        max_losses: float,
-    ):
-        """
-        Given the path to a dataturks .json format input file directory, a list
-        of entities and a path to an existent Spacy model, trains that model for
-        `n_iter` iterations with the given entities. Whenever a best model is
-        found it is writen to disk at the given output path.
 
-        :param training_files_path: A string representing the path to the input
-        files directory.  
-        :param n_iter: An integer representing a number of iterations.  
-        :param model_path: A string representing the path to the model to train.  
-        :param entities: A list of string representing the entities to consider
-        during training.  
-        :param best_model_path: A string representing the path to write the best
-        trained model.  
-        :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.  
-        """
+# FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
+# de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
+# debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
+    # def train_all_files_in_folder(
+        # self,
+        # training_files_path: str,
+        # n_iter: int,
+        # model_path: str,
+        # entities: list,
+        # best_model_path: str,
+        # max_losses: float,
+    # ):
+        # """
+        # Given the path to a dataturks .json format input file directory, a list
+        # of entities and a path to an existent Spacy model, trains that model for
+        # `n_iter` iterations with the given entities. Whenever a best model is
+        # found it is writen to disk at the given output path.
+# 
+        # :param training_files_path: A string representing the path to the input
+        # files directory.  
+        # :param n_iter: An integer representing a number of iterations.  
+        # :param model_path: A string representing the path to the model to train.  
+        # :param entities: A list of string representing the entities to consider
+        # during training.  
+        # :param best_model_path: A string representing the path to write the best
+        # trained model.  
+        # :param max_losses: A float representing the maximum NER losses value
+        # to consider before start writing best models output.  
+        # """
 
-        # FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
-        # de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
-        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-        
-        begin_time = datetime.datetime.now()
-        onlyfiles = [
-            f
-            for f in listdir(training_files_path)
-            if isfile(join(training_files_path, f))
-        ]
-        random.shuffle(onlyfiles)
+        # 
+        # begin_time = datetime.datetime.now()
+        # onlyfiles = [
+            # f
+            # for f in listdir(training_files_path)
+            # if isfile(join(training_files_path, f))
+        # ]
+        # random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
-        best_losses = max_losses
-        processed_docs = 0
-        for file_name in onlyfiles:
-            logger.info(f"Started processing file at \"{file_name}\"...")
-            best_losses = self.train_model(
-                training_files_path + file_name,
-                n_iter,
-                model_path,
-                entities,
-                best_model_path,
-                best_losses,
-            )
-            processed_docs = processed_docs + 1
-            print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-            logger.info(f"Maximum considerable losses is \"{best_losses}\".")
-            logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
-        diff = datetime.datetime.now() - begin_time
-        logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
+        # best_losses = max_losses
+        # processed_docs = 0
+        # for file_name in onlyfiles:
+            # logger.info(f"Started processing file at \"{file_name}\"...")
+            # best_losses = self.train_model(
+                # training_files_path + file_name,
+                # n_iter,
+                # model_path,
+                # entities,
+                # best_model_path,
+                # best_losses,
+            # )
+            # processed_docs = processed_docs + 1
+            # print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
+            # logger.info(f"Maximum considerable losses is \"{best_losses}\".")
+            # logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
+        # diff = datetime.datetime.now() - begin_time
+        # logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
     # =================================
     # Evaluation and display functions
