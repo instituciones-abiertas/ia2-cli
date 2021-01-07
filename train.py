@@ -363,22 +363,6 @@ class SpacyUtils:
         init_time = time.clock()
         print("\nsettings", settings)
         
-        # Adam settings and defaults
-        if bool(settings["optimizer"]):
-            
-            if "lr" in settings["optimizer"]:
-                lr = settings["optimizer"]["lr"]
-            else:
-                lr = 0.004
-            
-            if "beta1" in settings["optimizer"]:
-                beta1 = settings["optimizer"]["beta1"]
-            else:
-                beta1 = 0.9
-        else:
-            lr = 0.004
-            beta1 = 0.9 
-
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -403,8 +387,8 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": lr,
-            "beta1": beta1,
+            "lr": settings["lr"],
+            "beta1": settings["beta1"],
             "elapsed_time": 0,
             "stop": False
         }
@@ -499,17 +483,29 @@ class SpacyUtils:
                 train_config = train_config[config]
 
             # train settings
+
+            # Adam settings and defaults
             if not "optimizer" in train_config:
-                opt = {}
+                lr = 0.004
+                beta1 = 0.9 
             else:
-                opt = train_config["optimizer"]
+                if "lr" in train_config["optimizer"]:
+                    lr = train_config["optimizer"]["lr"]
+                else:
+                    lr = 0.004
+                
+                if "beta1" in train_config["optimizer"]:
+                    beta1 = train_config["optimizer"]["beta1"]
+                else:
+                    beta1 = 0.9
 
             #if type(myVariable) == int or type(myVariable) == float:
-            
 
             settings = {
-                "optimizer": opt,
-                
+                "lr": lr,
+                "beta1": beta1,
+                "dropout": 0.3,
+                "batch_size": compounding(10., 32, 1.8)
             }
 
             on_iter_cb = []
@@ -645,6 +641,9 @@ class SpacyUtils:
                         save_csv_history()
                     ]
                 }
+
+            # TODO default settings just in case not using train_config.json
+            
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
