@@ -412,7 +412,7 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=4)
+            batches = minibatch(training_data, size=settings["batch_size"])
             num_batches = 0    
             
             for batch in batches:
@@ -422,7 +422,7 @@ class SpacyUtils:
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
-                    drop=0,  #TODO we are trying to overfit the model! we should change it once we've found a good model
+                    drop=settings["dropout"],
                     losses=losses,
                     sgd=optimizer,
                 )
