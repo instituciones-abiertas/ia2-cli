@@ -364,22 +364,6 @@ class SpacyUtils:
         init_time = time.time()
         print("\nsettings", settings)
         
-        # Adam settings and defaults
-        if bool(settings["optimizer"]):
-            
-            if "lr" in settings["optimizer"]:
-                lr = settings["optimizer"]["lr"]
-            else:
-                lr = 0.004
-            
-            if "beta1" in settings["optimizer"]:
-                beta1 = settings["optimizer"]["beta1"]
-            else:
-                beta1 = 0.9
-        else:
-            lr = 0.004
-            beta1 = 0.9 
-
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -404,8 +388,8 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": lr,
-            "beta1": beta1,
+            "lr": settings["lr"],
+            "beta1": settings["beta1"],
             "elapsed_time": 0,
             "stop": False
         }
@@ -429,7 +413,7 @@ class SpacyUtils:
             optimizer.beta1 = state["beta1"]
 
             # Creates mini batches
-            batches = minibatch(training_data, size=4)
+            batches = minibatch(training_data, size=settings["batch_size"])
             num_batches = 0    
             
             for batch in batches:
@@ -439,7 +423,7 @@ class SpacyUtils:
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
-                    drop=0,  #TODO we are trying to overfit the model! we should change it once we've found a good model
+                    drop=settings["dropout"],
                     losses=losses,
                     sgd=optimizer,
                 )
@@ -498,17 +482,47 @@ class SpacyUtils:
                 train_config = train_config[config]
 
             # train settings
-            if not "optimizer" in train_config:
-                opt = {}
-            else:
-                opt = train_config["optimizer"]
 
-            #if type(myVariable) == int or type(myVariable) == float:
+            # Adam settings and defaults
+            if not "optimizer" in train_config:
+                lr = 0.004
+                beta1 = 0.9 
+            else:
+                if "lr" in train_config["optimizer"]:
+                    lr = train_config["optimizer"]["lr"]
+                else:
+                    lr = 0.004
+                
+                if "beta1" in train_config["optimizer"]:
+                    beta1 = train_config["optimizer"]["beta1"]
+                else:
+                    beta1 = 0.9
+
+            # the dropout
+            if not "dropout" in train_config:
+                dropout = 0.2
+            else:   
+                if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
+                    dropout = train_config["dropout"]
+                else:
+                    d = train_config["dropout"]
+                    dropout = FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
             
+            # the batch size
+            if not "batch_size" in train_config:
+                batch_size = 4
+            else:   
+                if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
+                    batch_size = train_config["batch_size"]
+                else:
+                    b = train_config["batch_size"]
+                    batch_size = FUNC_MAP[b.pop("f")](b["from"], b["to"], b["rate"])         
 
             settings = {
-                "optimizer": opt,
-                
+                "lr": lr,
+                "beta1": beta1,
+                "dropout": dropout,
+                "batch_size": batch_size
             }
 
             on_iter_cb = []
@@ -579,8 +593,7 @@ class SpacyUtils:
         trained model.  
         :param max_losses: A float representing the maximum NER losses value
         to consider before start writing best models output.
-        :param is_raw A boolean that determines if the train file will be converted.
-        True by default
+        :param is_raw A boolean that determines if the train file will be converteb        True by default
         """
 
         if is_raw:
@@ -614,11 +627,7 @@ class SpacyUtils:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
 
-        # if path_data_validation != "":
-        #     for _, val_annotations in validation_data:
-        #         for ent in annotations.get("entities"):
-        #             ner.add_label(ent[2])
-
+        
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
@@ -647,6 +656,9 @@ class SpacyUtils:
                         save_csv_history()
                     ]
                 }
+
+            # TODO default settings just in case not using train_config.json
+            
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
