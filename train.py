@@ -29,8 +29,6 @@ formatter = logging.Formatter('[%(asctime)s] (%(name)s) :: %(levelname)s :: %(me
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
-# Sets a global default value for DROPOUT_RATE
-DROPOUT_RATE = 0.2
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -318,29 +316,30 @@ class SpacyUtils:
     # Model Training functions
     # =================================
 
-    def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
-        for batch in batches:
-            texts, annotations = zip(*batch)
+#FIXME no se está usando esta función
+    # def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
+        # for batch in batches:
+            # texts, annotations = zip(*batch)
 
-            nlp.update(
-                texts, # batch of raw texts
-                annotations, # batch of annotations
-                drop=DROPOUT_RATE,
-                losses=losses,
-                sgd=optimizer,
-            )
-        logger.info(f"⬇️ Losses rate: [{losses}]")
-        try:
-            numero_losses = losses.get("ner")
-            if numero_losses < best and numero_losses > 0:
-                best = numero_losses
-                nlp.to_disk(path_best_model)
-                logger.info(f"💾 Saving model with losses: [{best}]")
+            # nlp.update(
+                # texts, # batch of raw texts
+                # annotations, # batch of annotations
+                # drop=DROPOUT_RATE,
+                # losses=losses,
+                # sgd=optimizer,
+            # )
+        # logger.info(f"⬇️ Losses rate: [{losses}]")
+        # try:
+            # numero_losses = losses.get("ner")
+            # if numero_losses < best and numero_losses > 0:
+                # best = numero_losses
+                # nlp.to_disk(path_best_model)
+                # logger.info(f"💾 Saving model with losses: [{best}]")
 
-        except Exception:
-            logger.exception("The batch has no training data.")
+        # except Exception:
+            # logger.exception("The batch has no training data.")
 
-        return best
+        # return best
 
     def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches, dropout):
         state["history"]["ner"].append(numero_losses)
@@ -360,8 +359,8 @@ class SpacyUtils:
         state["history"]["dropout"].append(dropout)      
 
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks={}, settings={}):
-        init_time = datetime.datetime.now()
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}):
+        init_time = time.time()
         print("\nsettings", settings)
         
         state = {
@@ -468,11 +467,50 @@ class SpacyUtils:
             state["i"] += 1
 
         # Run callbacks after train loop
-        state["elapsed_time"] = (datetime.datetime.now() - init_time)
+        state["elapsed_time"] = (time.time() - init_time)/60
         for cb in callbacks["on_stop"]:
-            state = cb(state, logger, nlp, optimizer)        
+            state = cb(state, logger, nlp, optimizer)
 
-        return best
+
+    def set_lr_and_beta1(self, train_config):
+        # Adam settings and defaults
+        if not "optimizer" in train_config:
+            lr = 0.004
+            beta1 = 0.9 
+        else:
+            if "lr" in train_config["optimizer"]:
+                lr = train_config["optimizer"]["lr"]
+            else:
+                lr = 0.004
+            
+            if "beta1" in train_config["optimizer"]:
+                beta1 = train_config["optimizer"]["beta1"]
+            else:
+                beta1 = 0.9
+        return lr, beta1
+
+    def set_dropout(self, train_config, FUNC_MAP):
+        # TODO NOT working with decaying 
+        if not "dropout" in train_config:
+            return 0.2
+        else:   
+            if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
+                return train_config["dropout"]
+            else:
+                d = train_config["dropout"]
+                return FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
+
+
+    def set_batch_size(self, train_config, FUNC_MAP):
+        if not "batch_size" in train_config:
+            return 4, ()
+        else:   
+            if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
+                return train_config["batch_size"], ()
+            else:
+                b = train_config["batch_size"]
+                return (FUNC_MAP[b.pop("f")], (b["from"], b["to"], b["rate"]))        
+
 
     def train(self, config: str):
         """
@@ -499,40 +537,9 @@ class SpacyUtils:
                 train_config = train_config[config]
 
             # train settings
-
-            # Adam settings and defaults
-            if not "optimizer" in train_config:
-                lr = 0.004
-                beta1 = 0.9 
-            else:
-                if "lr" in train_config["optimizer"]:
-                    lr = train_config["optimizer"]["lr"]
-                else:
-                    lr = 0.004
-                
-                if "beta1" in train_config["optimizer"]:
-                    beta1 = train_config["optimizer"]["beta1"]
-                else:
-                    beta1 = 0.9
-
-            batch_args = ()
-            
-            # the dropout
-            if not "dropout" in train_config:
-                dropout = 0.2
-            else:   
-                dropout = train_config["dropout"]
-            
-            # the batch size
-            if not "batch_size" in train_config:
-                batch_size = 4
-            else:   
-                if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
-                    batch_size = train_config["batch_size"]
-                else:
-                    b = train_config["batch_size"]
-                    batch_size = FUNC_MAP[b.pop("f")]
-                    batch_args = (b["from"], b["to"], b["rate"])
+            lr, beta1 = self.set_lr_and_beta1(train_config)
+            dropout = self.set_dropout(train_config, FUNC_MAP)
+            batch_size, batch_args = self.set_batch_size(train_config, FUNC_MAP)
 
             s = {
                 "lr": lr,
@@ -613,7 +620,6 @@ class SpacyUtils:
         to consider before start writing best models output.
         :param is_raw A boolean that determines if the train file will be converteb        True by default
         """
-        best = max_losses
 
         if is_raw:
             logger.info(f"loading and converting training data from dataturks: {path_data_training}")
@@ -652,6 +658,10 @@ class SpacyUtils:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
 
+            # we save the first model and then we update it if there is a better version of it
+            logger.info(f"💾 Saving initial model")
+            nlp.to_disk(model_path)
+
             # adding plugins for each step of train loop train loop
             # these are default callbacks
             if not bool(callbacks):
@@ -677,68 +687,66 @@ class SpacyUtils:
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
-            #TODO deberíamos guardar el primero y actualizar si hay un mejor modelo
-            nlp.to_disk(model_path)
-            return best
+            self.get_best_model(optimizer, nlp, n_iter, training_data, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
 
-    def train_all_files_in_folder(
-        self,
-        training_files_path: str,
-        n_iter: int,
-        model_path: str,
-        entities: list,
-        best_model_path: str,
-        max_losses: float,
-    ):
-        """
-        Given the path to a dataturks .json format input file directory, a list
-        of entities and a path to an existent Spacy model, trains that model for
-        `n_iter` iterations with the given entities. Whenever a best model is
-        found it is writen to disk at the given output path.
 
-        :param training_files_path: A string representing the path to the input
-        files directory.  
-        :param n_iter: An integer representing a number of iterations.  
-        :param model_path: A string representing the path to the model to train.  
-        :param entities: A list of string representing the entities to consider
-        during training.  
-        :param best_model_path: A string representing the path to write the best
-        trained model.  
-        :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.  
-        """
+# FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
+# de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
+# debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
+    # def train_all_files_in_folder(
+        # self,
+        # training_files_path: str,
+        # n_iter: int,
+        # model_path: str,
+        # entities: list,
+        # best_model_path: str,
+        # max_losses: float,
+    # ):
+        # """
+        # Given the path to a dataturks .json format input file directory, a list
+        # of entities and a path to an existent Spacy model, trains that model for
+        # `n_iter` iterations with the given entities. Whenever a best model is
+        # found it is writen to disk at the given output path.
+# 
+        # :param training_files_path: A string representing the path to the input
+        # files directory.  
+        # :param n_iter: An integer representing a number of iterations.  
+        # :param model_path: A string representing the path to the model to train.  
+        # :param entities: A list of string representing the entities to consider
+        # during training.  
+        # :param best_model_path: A string representing the path to write the best
+        # trained model.  
+        # :param max_losses: A float representing the maximum NER losses value
+        # to consider before start writing best models output.  
+        # """
 
-        # FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
-        # de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
-        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-        
-        begin_time = datetime.datetime.now()
-        onlyfiles = [
-            f
-            for f in listdir(training_files_path)
-            if isfile(join(training_files_path, f))
-        ]
-        random.shuffle(onlyfiles)
+        # 
+        # begin_time = datetime.datetime.now()
+        # onlyfiles = [
+            # f
+            # for f in listdir(training_files_path)
+            # if isfile(join(training_files_path, f))
+        # ]
+        # random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
-        best_losses = max_losses
-        processed_docs = 0
-        for file_name in onlyfiles:
-            logger.info(f"Started processing file at \"{file_name}\"...")
-            best_losses = self.train_model(
-                training_files_path + file_name,
-                n_iter,
-                model_path,
-                entities,
-                best_model_path,
-                best_losses,
-            )
-            processed_docs = processed_docs + 1
-            print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-            logger.info(f"Maximum considerable losses is \"{best_losses}\".")
-            logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
-        diff = datetime.datetime.now() - begin_time
-        logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
+        # best_losses = max_losses
+        # processed_docs = 0
+        # for file_name in onlyfiles:
+            # logger.info(f"Started processing file at \"{file_name}\"...")
+            # best_losses = self.train_model(
+                # training_files_path + file_name,
+                # n_iter,
+                # model_path,
+                # entities,
+                # best_model_path,
+                # best_losses,
+            # )
+            # processed_docs = processed_docs + 1
+            # print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
+            # logger.info(f"Maximum considerable losses is \"{best_losses}\".")
+            # logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
+        # diff = datetime.datetime.now() - begin_time
+        # logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
     # =================================
     # Evaluation and display functions
@@ -771,6 +779,10 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
+            # print(doc_gold_text)
+            # print(entity_ocurrences.get('entities'))
+            prueba = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get('entities'))
+            # print(prueba)
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get('entities'))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
