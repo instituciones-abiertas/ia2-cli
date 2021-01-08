@@ -29,8 +29,6 @@ formatter = logging.Formatter('[%(asctime)s] (%(name)s) :: %(levelname)s :: %(me
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
-# Sets a global default value for DROPOUT_RATE
-DROPOUT_RATE = 0.2
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -458,6 +456,45 @@ class SpacyUtils:
             state = cb(state, logger, nlp, optimizer)
 
 
+    def set_lr_and_beta1(self, train_config):
+        # Adam settings and defaults
+        if not "optimizer" in train_config:
+            lr = 0.004
+            beta1 = 0.9 
+        else:
+            if "lr" in train_config["optimizer"]:
+                lr = train_config["optimizer"]["lr"]
+            else:
+                lr = 0.004
+            
+            if "beta1" in train_config["optimizer"]:
+                beta1 = train_config["optimizer"]["beta1"]
+            else:
+                beta1 = 0.9
+        return lr, beta1
+
+    def set_dropout(self, train_config, FUNC_MAP):
+        if not "dropout" in train_config:
+            return 0.2
+        else:   
+            if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
+                return train_config["dropout"]
+            else:
+                d = train_config["dropout"]
+                return FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
+
+
+    def set_batch_size(self, train_config, FUNC_MAP):
+        if not "batch_size" in train_config:
+            return 4
+        else:   
+            if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
+                return train_config["batch_size"]
+            else:
+                b = train_config["batch_size"]
+                return FUNC_MAP[b.pop("f")](b["from"], b["to"], b["rate"])        
+
+
     def train(self, config: str):
         """
         Runs the train_model method using the selected configuration from train_config.json
@@ -482,41 +519,9 @@ class SpacyUtils:
                 train_config = train_config[config]
 
             # train settings
-
-            # Adam settings and defaults
-            if not "optimizer" in train_config:
-                lr = 0.004
-                beta1 = 0.9 
-            else:
-                if "lr" in train_config["optimizer"]:
-                    lr = train_config["optimizer"]["lr"]
-                else:
-                    lr = 0.004
-                
-                if "beta1" in train_config["optimizer"]:
-                    beta1 = train_config["optimizer"]["beta1"]
-                else:
-                    beta1 = 0.9
-
-            # the dropout
-            if not "dropout" in train_config:
-                dropout = 0.2
-            else:   
-                if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
-                    dropout = train_config["dropout"]
-                else:
-                    d = train_config["dropout"]
-                    dropout = FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
-            
-            # the batch size
-            if not "batch_size" in train_config:
-                batch_size = 4
-            else:   
-                if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
-                    batch_size = train_config["batch_size"]
-                else:
-                    b = train_config["batch_size"]
-                    batch_size = FUNC_MAP[b.pop("f")](b["from"], b["to"], b["rate"])         
+            lr, beta1 = self.set_lr_and_beta1(train_config)
+            dropout = self.set_dropout(train_config, FUNC_MAP)
+            batch_size = self.set_batch_size(train_config, FUNC_MAP)
 
             settings = {
                 "lr": lr,
@@ -754,6 +759,10 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
+            # print(doc_gold_text)
+            # print(entity_ocurrences.get('entities'))
+            prueba = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get('entities'))
+            # print(prueba)
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get('entities'))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
