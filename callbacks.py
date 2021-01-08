@@ -148,6 +148,30 @@ def sleep(secs=0.5, log=False):
 
   return sleep_cb
 
+
+def change_dropout_fixed(step=0.01, until=0.5):
+  """
+  [experimental] change the dropout each epoch
+  """
+  def change_dropout_fixed_cb(state, logger, model, optimizer):
+    
+    state["dropout"]
+    if  step > 0 and state["dropout"] < until:
+      state["dropout"] += step
+      logger.info(f"[change_dropout_fixed] touching dropout. New value {state['dropout']}")
+    elif step < 0 and state["dropout"] > until:
+      # negative step
+      state["dropout"] += step
+      logger.info(f"[change_dropout_fixed] touching dropout. New value {state['dropout']}")
+
+    else:
+      logger.info(f"[change_dropout_fixed] No more room for touching dropout")
+
+    return state
+
+  return change_dropout_fixed_cb
+
+
 # on stop plugins
 
 def log_best_scores():
@@ -192,7 +216,7 @@ def save_csv_history(filename="history.csv", session=""):
     else:
       s = session
 
-    header = ["session", "epoch", "batches", "lr", "ner", "f_score", "recall", "precision", "per_type_score",
+    header = ["session", "epoch", "batches", "lr", "dropout", "ner", "f_score", "recall", "precision", "per_type_score",
      "val_f_score", "val_recall", "val_precision", "val_per_type_score"]
     rows = []
 
@@ -204,6 +228,7 @@ def save_csv_history(filename="history.csv", session=""):
         "epoch": i+1,
         "batches": state["history"]["batches"][i],
         "lr": state["history"]["lr"][i],
+        "dropout": state["history"]["dropout"][i],
         "ner": state["history"]["ner"][i],
         "f_score": state["history"]["f_score"][i],
         "recall": state["history"]["recall"][i],
