@@ -19,7 +19,7 @@ import srsly
 from os import listdir
 from os.path import isfile, join
 from callbacks import (print_scores_on_epoch, save_best_model, reduce_lr_on_plateau,
-    early_stop, update_best_scores, sleep, log_best_scores, save_csv_history)
+    early_stop, update_best_scores, sleep, log_best_scores, save_csv_history, change_dropout_fixed)
 
 logger = logging.getLogger('Spacy cli util')
 logger.setLevel(logging.DEBUG)
@@ -342,7 +342,7 @@ class SpacyUtils:
 
         return best
 
-    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches):
+    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches, dropout):
         state["history"]["ner"].append(numero_losses)
         state["history"]["f_score"].append(f_score)
         state["history"]["recall"].append(recall_score)
@@ -353,10 +353,11 @@ class SpacyUtils:
         state["history"]["val_f_score"].append(val_f_score)
         state["history"]["val_recall"].append(val_recall_score)
         state["history"]["val_precision"].append(val_precision_score)
-        state["history"]["val_per_type_score"].append(per_type_score)
+        state["history"]["val_per_type_score"].append(val_per_type_score)
 
         state["history"]["lr"].append(learn_rate)
-        state["history"]["batches"].append(num_batches)        
+        state["history"]["batches"].append(num_batches)
+        state["history"]["dropout"].append(dropout)      
 
 
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, validation_data=[], callbacks={}, settings={}):
@@ -378,7 +379,8 @@ class SpacyUtils:
                 "val_precision": [],
                 "val_per_type_score": [],
                 "lr": [],
-                "batches": []  # processed batches
+                "batches": [],  # processed batches
+                "dropout": []
             },
             "min_ner": 0,
             "max_f_score": 0,
@@ -389,6 +391,7 @@ class SpacyUtils:
             "max_val_precision": 0,
             "lr": settings["lr"],
             "beta1": settings["beta1"],
+            "dropout": settings["dropout"],
             "elapsed_time": 0,
             "stop": False
         }
@@ -411,18 +414,30 @@ class SpacyUtils:
             optimizer.learn_rate = state["lr"]
             optimizer.beta1 = state["beta1"]
 
+            if  len(settings["batch_args"]) > 0:   
+                batch_size = settings["batch_size"](*settings["batch_args"]) 
+            else:
+                batch_size = settings["batch_size"]
+
+            # if  len(settings["dropout_args"]) > 0:
+            #     dropout = settings["dropout"](*settings["dropout_args"]) 
+                
+            # else:
+            #     dropout = settings["dropout"]
+
             # Creates mini batches
-            batches = minibatch(training_data, size=settings["batch_size"])
+            batches = minibatch(training_data, size=batch_size)
             num_batches = 0    
-            
+            bz = []
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
-
+                
+                bz.append(len(texts))
                 nlp.update(
                     texts, # batch of raw texts
                     annotations, # batch of annotations
-                    drop=settings["dropout"],
+                    drop=state["dropout"],
                     losses=losses,
                     sgd=optimizer,
                 )
@@ -432,6 +447,7 @@ class SpacyUtils:
                     state = cb(state, logger, nlp, optimizer)
                 
             try:
+                print(bz)
                 # compute validation scores
                 val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
                 
@@ -442,7 +458,7 @@ class SpacyUtils:
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, optimizer.learn_rate, num_batches)
+            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, optimizer.learn_rate, num_batches, state["dropout"])
 
             # run callbacks after each iteration
                
@@ -472,6 +488,7 @@ class SpacyUtils:
             "save_csv_history": save_csv_history,
             "sleep": sleep,
             "print_scores_on_epoch": print_scores_on_epoch,
+            "change_dropout_fixed": change_dropout_fixed,
             # spacy funcs
             "compounding": compounding,
             "decaying": decaying
@@ -498,15 +515,13 @@ class SpacyUtils:
                 else:
                     beta1 = 0.9
 
+            batch_args = ()
+            
             # the dropout
             if not "dropout" in train_config:
                 dropout = 0.2
             else:   
-                if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
-                    dropout = train_config["dropout"]
-                else:
-                    d = train_config["dropout"]
-                    dropout = FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
+                dropout = train_config["dropout"]
             
             # the batch size
             if not "batch_size" in train_config:
@@ -516,13 +531,16 @@ class SpacyUtils:
                     batch_size = train_config["batch_size"]
                 else:
                     b = train_config["batch_size"]
-                    batch_size = FUNC_MAP[b.pop("f")](b["from"], b["to"], b["rate"])         
+                    batch_size = FUNC_MAP[b.pop("f")]
+                    batch_args = (b["from"], b["to"], b["rate"])
 
-            settings = {
+            s = {
                 "lr": lr,
                 "beta1": beta1,
                 "dropout": dropout,
-                "batch_size": batch_size
+                # "dropout_args": dropout_args,
+                "batch_size": batch_size,
+                "batch_args": batch_args
             }
 
             on_iter_cb = []
@@ -537,7 +555,7 @@ class SpacyUtils:
             for cb in train_config["callbacks"]["on_stop"]:
                 on_stop_cb.append(FUNC_MAP[cb.pop("f")](**cb))
                 
-            callbacks = {
+            c = {
                 "on_iteration": on_iter_cb,
                 "on_batch": on_batch_cb,
                 "on_stop": on_stop_cb
@@ -558,8 +576,8 @@ class SpacyUtils:
                 train_config["threshold"],
                 train_config["is_raw"],
                 train_config["path_data_validation"],
-                callbacks=callbacks,
-                settings=settings,
+                callbacks=c,
+                settings=s,
                 train_subset=train_config["train_subset"]
             )  
 
