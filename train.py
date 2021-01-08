@@ -759,10 +759,6 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
-            # print(doc_gold_text)
-            # print(entity_ocurrences.get('entities'))
-            prueba = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get('entities'))
-            # print(prueba)
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get('entities'))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
