@@ -112,7 +112,7 @@ class SpacyUtils:
     def create_blank_model(self, output_path: str):
         """
         Given an output path creates a blank model using the "es" language.
-        :param output_path: A string representing an output path.  
+        :param output_path: A string representing an output path.
 
         """
         nlp = spacy.blank("es")
@@ -125,9 +125,9 @@ class SpacyUtils:
         Spacy api and saves it at the given path.
 
         :param spacy_model: A string representing a Spacy model. E.g.:
-        "es_core_news_lg".  
+        "es_core_news_lg".
         :param output_path: A string representing the output path where the
-        model should be written.  
+        model should be written.
         """
         nlp = spacy.load(spacy_model)
         nlp.to_disk(output_path)
@@ -142,8 +142,8 @@ class SpacyUtils:
         Given a list of entities and a Spacy model path, adds every entity to
         the model and updates the model to the given path.
 
-        :param ents: A list of string representing entites  
-        :param model_path: A model path  
+        :param ents: A list of string representing entites
+        :param model_path: A model path
         """
         arr = sys.argv[2].split(',')
         nlp = spacy.load(model_path)
@@ -172,10 +172,10 @@ class SpacyUtils:
         pickle dump it at the given output path.
 
         :param input_file_path: A string representing the path to a dataturks
-        .json format input file.  
-        :param output_file_path: A string representing the output path.  
+        .json format input file.
+        :param output_file_path: A string representing the output path.
         :param entities: A list of string representing entities to recognise
-        during data conversion.  
+        during data conversion.
         """
         logger.info(f"Starts converting data from \"{input_file_path}\"...")
         training_data = []
@@ -197,10 +197,10 @@ class SpacyUtils:
         writes it out to the given output directory.
 
         :param input_files_path: Directory pointing to dataturks .json files to
-        be converted.  
+        be converted.
         :param entities: A list of entities, separated by comma, to be
-        considered during annotations extraction from each dadaturks batch.  
-        :param output_file_path: The path and name of the output file.  
+        considered during annotations extraction from each dadaturks batch.
+        :param output_file_path: The path and name of the output file.
         """
         nlp = spacy.load("es_core_news_lg", disable=["ner"])
 
@@ -354,15 +354,15 @@ class SpacyUtils:
         disk at the given output path.
 
         :param path_data_training: A string representing the path to the input
-        file.  
-        :param n_iter: An integer representing a number of iterations.  
-        :param model_path: A string representing the path to the model to train.  
+        file.
+        :param n_iter: An integer representing a number of iterations.
+        :param model_path: A string representing the path to the model to train.
         :param ents: A list of string representing the entities to consider
-        during training.  
+        during training.
         :param path_best_model: A string representing the path to write the best
-        trained model.  
+        trained model.
         :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.  
+        to consider before start writing best models output.
         """
         best = max_losses
         training_data = convert_dataturks_to_spacy(path_data_training, ents)
@@ -386,7 +386,7 @@ class SpacyUtils:
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model)
-            
+
             nlp.to_disk(model_path)
             return best
 
@@ -406,15 +406,15 @@ class SpacyUtils:
         found it is writen to disk at the given output path.
 
         :param training_files_path: A string representing the path to the input
-        files directory.  
-        :param n_iter: An integer representing a number of iterations.  
-        :param model_path: A string representing the path to the model to train.  
+        files directory.
+        :param n_iter: An integer representing a number of iterations.
+        :param model_path: A string representing the path to the model to train.
         :param entities: A list of string representing the entities to consider
-        during training.  
+        during training.
         :param best_model_path: A string representing the path to write the best
-        trained model.  
+        trained model.
         :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.  
+        to consider before start writing best models output.
         """
         begin_time = datetime.datetime.now()
         onlyfiles = [
@@ -426,7 +426,7 @@ class SpacyUtils:
         # self.add_new_entity_to_model(entities, model_path)
         # FIXME NO le damos bola al max_losses que viene por parámetro, sino a la mejora en losses
         # se debería considerar refactorizar la forma en que iteramos => n_iter, files, minibatches
-        # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo, 
+        # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo,
         # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
         best_losses = 300 #max_losses
         processed_docs = 0
@@ -456,9 +456,9 @@ class SpacyUtils:
         Given a path to an existent Spacy model and a raw text, uses the model
         to output predictions and serve them at port 5030 using DisplayCy.
 
-        :param model_path: A string representing the path to a Spacy model.  
+        :param model_path: A string representing the path to a Spacy model.
         :param text: A string representing raw text for the model to predict
-        results.  
+        results.
         """
         nlp = spacy.load(model_path, disable=["tagger", "parser"])
         doc = nlp(text)
@@ -471,9 +471,9 @@ class SpacyUtils:
         scores.
 
         :param model_path: A string representing the directory of an existent
-        Spacy model.  
-        :param text: A raw text to use as evaluation data.  
-        :param entity_occurences: A list of entity occurrences.  
+        Spacy model.
+        :param text: A raw text to use as evaluation data.
+        :param entity_occurences: A list of entity occurrences.
         """
         scorer = Scorer()
         try:
@@ -506,9 +506,9 @@ class SpacyUtils:
         list of entities, prints the total number of examples by label.
 
         :param files_path: Directory pointing to dataturks .json files to
-        be converted.  
+        be converted.
         :param entities: A list of entities, separated by comma, to be
-        considered in the final output.  
+        considered in the final output.
         """
         entities = entities.split(",")
         input_files_dir_path = files_path
@@ -530,12 +530,41 @@ class SpacyUtils:
             all_entities[entity] = entity_length
         logger.info(f"Total entities output: {all_entities}")
 
+
+    def show_text(self, files_path: str, entity: str):
+        """
+        Given the path to a dataturks .json format input file directory and an
+        entity name, prints the annotation text from label.
+
+        :param files_path: Directory pointing to dataturks .json files
+        :param entity: entity label name.
+        """
+        files = [
+            os.path.join(files_path, f)
+            for f in listdir(files_path)
+            if isfile(join(files_path, f))
+        ]
+        texts = []
+
+        for file_ in files:
+            with open(file_, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    data = json.loads(line)
+                    for a in data["annotation"] or []:
+                        if a["label"][0] == entity:
+                            if not a["points"][0]["text"] in texts:
+                                texts.append(a["points"][0]["text"])
+        for text in texts:
+            print(text)
+
+
     def run_command_with_timer(self,*args):
         """
         Calculate the time spend to run command
 
         :param *args: run command
-        """  
+        """
         begin_time = datetime.datetime.now()
         logger.info("####START####")
         logger.info(f"Start process {begin_time} ")
