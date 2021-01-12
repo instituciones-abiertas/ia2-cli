@@ -273,12 +273,7 @@ class SpacyUtils:
 
         return best
 
-<<<<<<< HEAD
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
-=======
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, disabled_pipes):
-        best_f_score = 0
->>>>>>> agregad habilitacion de pipes luego de entrenar
         early_stop = 0
         not_improve = 30
         itn = 0
@@ -372,21 +367,16 @@ class SpacyUtils:
         for _, annotations in training_data:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
-        #Save disable pipelines
-        disabled_pipes=nlp.disable_pipes(*other_pipes)
+        # Save disable pipelines
+        disabled_pipes = nlp.disable_pipes(*other_pipes)
 
-        with  warnings.catch_warnings():
+        with warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
-<<<<<<< HEAD
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model)
-
-=======
             best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, disabled_pipes)
             # Enable all pipes
             disabled_pipes.restore()
->>>>>>> agregad habilitacion de pipes luego de entrenar
             nlp.to_disk(model_path)
             return best
 
