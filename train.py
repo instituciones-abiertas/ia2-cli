@@ -531,7 +531,7 @@ class SpacyUtils:
         logger.info(f"Total entities output: {all_entities}")
 
 
-    def show_text(self, files_path: str, entity: str):
+    def show_text(self, files_path: str, entity: str, context_words=0):
         """
         Given the path to a dataturks .json format input file directory and an
         entity name, prints the annotation text from label.
@@ -552,9 +552,20 @@ class SpacyUtils:
                 for line in lines:
                     data = json.loads(line)
                     for a in data["annotation"] or []:
+                        output = ""
                         if a["label"][0] == entity:
                             if not a["points"][0]["text"] in texts:
-                                texts.append(a["points"][0]["text"])
+                                text = a["points"][0]["text"]
+                                if context_words:
+                                    text = re.escape(a["points"][0]["text"])
+                                    interval = r"{{0,{0}}}".format(context_words)
+                                    regex = r"((?:\S+\s+)"+ interval + r"\b" + text + r"\b\s*(?:\S+\b\s*)" + interval +")"
+                                    x = re.search(regex, data["content"])
+                                    if x:
+                                        output = x.group()
+                                else:
+                                    output = text
+                                texts.append(output)
         for text in texts:
             print(text)
 
