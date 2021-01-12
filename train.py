@@ -18,16 +18,17 @@ import srsly
 from os import listdir
 from os.path import isfile, join
 
-logger = logging.getLogger('Spacy cli util')
+logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
-logger_fh = logging.FileHandler('logs/debug.log')
+logger_fh = logging.FileHandler("logs/debug.log")
 logger_fh.setLevel(logging.DEBUG)
-formatter = logging.Formatter('[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s')
+formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s")
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
 # Sets a global default value for DROPOUT_RATE
-DROPOUT_RATE = 0.2
+DROPOUT_RATE = 0.20
+
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -56,9 +57,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
                                     point["end"] - point["start"],
                                 )
                             )
-                    annotations = sorted(
-                        annotations, key=lambda student: student[3], reverse=True
-                    )
+                    annotations = sorted(annotations, key=lambda student: student[3], reverse=True)
 
                     seen_tokens = set()
                     for annotation in annotations:
@@ -81,9 +80,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
         # logger.info("Overlapped entities : {}".format(count_overlaped))
         return training_data
     except Exception as e:
-        logging.exception(
-            "Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e)
-        )
+        logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
 
 
@@ -117,7 +114,7 @@ class SpacyUtils:
         """
         nlp = spacy.blank("es")
         nlp.to_disk(output_path)
-        logger.info(f"Succesfully created model at: \"{output_path}...\"")
+        logger.info(f'Succesfully created model at: "{output_path}..."')
 
     def create_custom_spacy_model(self, spacy_model: str, output_path: str):
         """
@@ -131,7 +128,7 @@ class SpacyUtils:
         """
         nlp = spacy.load(spacy_model)
         nlp.to_disk(output_path)
-        logger.info(f"Succesfully created model at: \"{output_path}\".")
+        logger.info(f'Succesfully created model at: "{output_path}".')
 
     # =================================
     # Update Models functions
@@ -145,11 +142,11 @@ class SpacyUtils:
         :param ents: A list of string representing entites
         :param model_path: A model path
         """
-        arr = sys.argv[2].split(',')
+        arr = sys.argv[2].split(",")
         nlp = spacy.load(model_path)
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
-            nlp.add_pipe(component,last=True)
+            nlp.add_pipe(component, last=True)
         ner = nlp.get_pipe("ner")
         for ent in arr:
             ner.add_label(ent)
@@ -157,15 +154,13 @@ class SpacyUtils:
         nlp.begin_training()
         nlp.to_disk(model_path)
 
-        logger.info(f"Succesfully added entities at model: \"{model_path}\".")
+        logger.info(f'Succesfully added entities at model: "{model_path}".')
 
     # =================================
     # Data Conversion functions
     # =================================
 
-    def convert_dataturks_to_spacy(
-        self, input_file_path: str, output_file_path: str, entities: list
-    ):
+    def convert_dataturks_to_spacy(self, input_file_path: str, output_file_path: str, entities: list):
         """
         Given a dataturks format .json file, an output path and a list of
         entities, converts the input data into Spacy recognisable format to
@@ -177,20 +172,15 @@ class SpacyUtils:
         :param entities: A list of string representing entities to recognise
         during data conversion.
         """
-        logger.info(f"Starts converting data from \"{input_file_path}\"...")
+        logger.info(f'Starts converting data from "{input_file_path}"...')
         training_data = []
-        log = convert_dataturks_to_spacy(input_file_path, entities)
-        with open(output_file_path, "a+") as f:
+        with open(output_file_path, "a+"):
             training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
         with open(output_file_path, "wb") as output:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
-        logger.info(f"Succesfully converted data at \"{output_file_path}\".")
+        logger.info(f'Succesfully converted data at "{output_file_path}".')
 
-    def convert_dataturks_to_training_cli(self,
-        input_files_path: str,
-        entities: list,
-        output_file_path: str
-    ):
+    def convert_dataturks_to_training_cli(self, input_files_path: str, entities: list, output_file_path: str):
         """
         Given an input directory and a list of entities, converts every .json
         file from the directory into a single .json recognisable by Spacy and
@@ -206,24 +196,19 @@ class SpacyUtils:
 
         TRAIN_DATA = []
         begin_time = datetime.datetime.now()
-        input_files = [
-            f
-            for f in listdir(input_files_path)
-            if isfile(join(input_files_path, f))
-        ]
+        input_files = [f for f in listdir(input_files_path) if isfile(join(input_files_path, f))]
 
         for input_file in input_files:
-            logger.info(f"Extracting raw data and occurrences from file: \"{input_file}\"...")
-            extracted_data = convert_dataturks_to_spacy(
-                f"{input_files_path}/{input_file}",
-                entities
-            )
+            logger.info(f'Extracting raw data and occurrences from file: "{input_file}"...')
+            extracted_data = convert_dataturks_to_spacy(f"{input_files_path}/{input_file}", entities)
             TRAIN_DATA = TRAIN_DATA + extracted_data
-            logger.info(f"Finished extracting data from file \"{input_file}\".")
+            logger.info(f'Finished extracting data from file "{input_file}".')
 
         diff = datetime.datetime.now() - begin_time
         logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
-        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")
+        logger.info(
+            f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format..."
+        )
 
         docs = []
         for text, annot in TRAIN_DATA:
@@ -239,9 +224,11 @@ class SpacyUtils:
                         "label": label,
                         "start_index": start_idx,
                         "end_index": end_idx,
-                        "matches_text": text[start_idx:end_idx]
+                        "matches_text": text[start_idx:end_idx],
                     }
-                    logger.critical(f"Conflicted entity: could not save an entity because it does not match an entity in the given document. Output: \"{conflicted_entity}\".")
+                    logger.critical(
+                        f'Conflicted entity: could not save an entity because it does not match an entity in the given document. Output: "{conflicted_entity}".'
+                    )
                 else:
                     new_ents.append(span)
 
@@ -252,11 +239,11 @@ class SpacyUtils:
         logger.info(f"Finished Converting {len(TRAIN_DATA)} Spacy Documents into trainable data. Lasted: {diff}")
 
         try:
-            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")
+            logger.info(f'💾 Writing final output at "{output_file_path}"...')
             srsly.write_json(output_file_path, [docs_to_json(docs)])
             logger.info("💾 Done.")
         except Exception:
-            logging.exception(f"An error occured writing the output file at \"{output_file_path}\".")
+            logging.exception(f'An error occured writing the output file at "{output_file_path}".')
 
     # =================================
     # Model Training functions
@@ -267,8 +254,8 @@ class SpacyUtils:
             texts, annotations = zip(*batch)
 
             nlp.update(
-                texts, # batch of raw texts
-                annotations, # batch of annotations
+                texts,  # batch of raw texts
+                annotations,  # batch of annotations
                 drop=DROPOUT_RATE,
                 losses=losses,
                 sgd=optimizer,
@@ -287,7 +274,6 @@ class SpacyUtils:
         return best
 
     def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model):
-        best_f_score = 0
         early_stop = 0
         not_improve = 30
         itn = 0
@@ -303,8 +289,8 @@ class SpacyUtils:
                 texts, annotations = zip(*batch)
 
                 nlp.update(
-                    texts, # batch of raw texts
-                    annotations, # batch of annotations
+                    texts,  # batch of raw texts
+                    annotations,  # batch of annotations
                     drop=DROPOUT_RATE,
                     losses=losses,
                     sgd=optimizer,
@@ -314,13 +300,14 @@ class SpacyUtils:
                 # print(f"f-score: {f_score} -  precision: {precision_score} - recall: {recall_score}")
                 numero_losses = losses.get("ner")
                 if numero_losses < best and numero_losses > 0:
-                # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
+                    # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
                     early_stop = 0
                     best = numero_losses
-                    best_f_score = f_score
                     with nlp.use_params(optimizer.averages):
                         nlp.to_disk(path_best_model)
-                    logger.info(f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}")
+                    logger.info(
+                        f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}"
+                    )
                 else:
                     early_stop += 1
 
@@ -330,10 +317,9 @@ class SpacyUtils:
             logger.info(f"Losses rate: {losses}, f1-score: {f_score}, early_stop: {early_stop}")
 
             if early_stop >= not_improve:
-                print(f"This batch is not improving enough, stopping training with it")
-                logger.info(f"This batch is not improving enough, stopping training with it")
+                print("This batch is not improving enough, stopping training with it")
+                logger.info("This batch is not improving enough, stopping training with it")
                 break
-
             itn += 1
 
         return best
@@ -417,21 +403,17 @@ class SpacyUtils:
         to consider before start writing best models output.
         """
         begin_time = datetime.datetime.now()
-        onlyfiles = [
-            f
-            for f in listdir(training_files_path)
-            if isfile(join(training_files_path, f))
-        ]
+        onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
         random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
         # FIXME NO le damos bola al max_losses que viene por parámetro, sino a la mejora en losses
         # se debería considerar refactorizar la forma en que iteramos => n_iter, files, minibatches
         # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo,
         # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-        best_losses = 300 #max_losses
+        best_losses = 300  # max_losses
         processed_docs = 0
         for file_name in onlyfiles:
-            logger.info(f"Started processing file at \"{file_name}\"...")
+            logger.info(f'Started processing file at "{file_name}"...')
             best_losses = self.train_model(
                 training_files_path + file_name,
                 n_iter,
@@ -442,7 +424,7 @@ class SpacyUtils:
             )
             processed_docs = processed_docs + 1
             print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-            logger.info(f"Maximum considerable losses is \"{best_losses}\".")
+            logger.info(f'Maximum considerable losses is "{best_losses}".')
             logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
         diff = datetime.datetime.now() - begin_time
         logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
@@ -478,7 +460,7 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
-            gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get('entities'))
+            gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
             return scorer.scores
@@ -494,10 +476,10 @@ class SpacyUtils:
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
                 scores = self.evaluate(nlp, text, entities_for_text)
-                recall_score_sum += scores.get('ents_r')
-                precision_score_sum += scores.get('ents_p')
-                f_score_sum += scores.get('ents_f')
-        #we are returning this 3 values to verify how the model goes
+                recall_score_sum += scores.get("ents_r")
+                precision_score_sum += scores.get("ents_p")
+                f_score_sum += scores.get("ents_f")
+        # we are returning this 3 values to verify how the model goes
         return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts)
 
     def count_examples(self, files_path: str, entities: list):
@@ -512,24 +494,17 @@ class SpacyUtils:
         """
         entities = entities.split(",")
         input_files_dir_path = files_path
-        onlyfiles = [
-            f
-            for f in listdir(input_files_dir_path)
-            if isfile(join(input_files_dir_path, f))
-        ]
+        onlyfiles = [f for f in listdir(input_files_dir_path) if isfile(join(input_files_dir_path, f))]
         all_entities = {}
         for entity in entities:
             entity_length = 0
             for file_ in onlyfiles:
-                validation_data = convert_dataturks_to_spacy(
-                    input_files_dir_path + file_, [entity]
-                )
+                validation_data = convert_dataturks_to_spacy(input_files_dir_path + file_, [entity])
                 for _, annotations in validation_data:
                     occurences = annotations.get("entities")
                     entity_length = entity_length + len(occurences)
             all_entities[entity] = entity_length
         logger.info(f"Total entities output: {all_entities}")
-
 
     def show_text(self, files_path: str, entity: str, context_words=0):
         """
@@ -539,11 +514,7 @@ class SpacyUtils:
         :param files_path: Directory pointing to dataturks .json files
         :param entity: entity label name.
         """
-        files = [
-            os.path.join(files_path, f)
-            for f in listdir(files_path)
-            if isfile(join(files_path, f))
-        ]
+        files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
         texts = []
 
         for file_ in files:
@@ -559,7 +530,15 @@ class SpacyUtils:
                                 if context_words:
                                     text = re.escape(a["points"][0]["text"])
                                     interval = r"{{0,{0}}}".format(context_words)
-                                    regex = r"((?:\S+\s+)"+ interval + r"\b" + text + r"\b\s*(?:\S+\b\s*)" + interval +")"
+                                    regex = (
+                                        r"((?:\S+\s+)"
+                                        + interval
+                                        + r"\b"
+                                        + text
+                                        + r"\b\s*(?:\S+\b\s*)"
+                                        + interval
+                                        + ")"
+                                    )
                                     x = re.search(regex, data["content"])
                                     if x:
                                         output = x.group()
@@ -569,8 +548,7 @@ class SpacyUtils:
         for text in texts:
             print(text)
 
-
-    def run_command_with_timer(self,*args):
+    def run_command_with_timer(self, *args):
         """
         Calculate the time spend to run command
 
@@ -579,10 +557,11 @@ class SpacyUtils:
         begin_time = datetime.datetime.now()
         logger.info("####START####")
         logger.info(f"Start process {begin_time} ")
-        subprocess.call(args[0],shell=True)
+        subprocess.call(args[0], shell=True)
         end = datetime.datetime.now()
         logger.info(f"End {end} to process ")
         logger.info(f"Spend {end-begin_time} to process ")
+
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
