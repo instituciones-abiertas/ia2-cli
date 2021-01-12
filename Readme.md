@@ -13,6 +13,13 @@ Instalar las dependencias necesarias:
 ```bash
 pip install -r requirements.txt
 ```
+***Inicializar precomitt en el repo***
+Es necesario instalar  precommit en el repo:
+```bash
+pre-commit install
+```
+
+
 
 #### Helper
 
