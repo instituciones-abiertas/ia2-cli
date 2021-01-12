@@ -17,6 +17,7 @@ pip install -r requirements.txt
 Es necesario instalar  precommit en el repo:
 ```bash
 pre-commit install
+
 ```
 
 
