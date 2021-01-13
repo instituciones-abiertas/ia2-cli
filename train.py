@@ -418,12 +418,6 @@ class SpacyUtils:
             else:
                 batch_size = settings["batch_size"]
 
-            # if  len(settings["dropout_args"]) > 0:
-            #     dropout = settings["dropout"](*settings["dropout_args"]) 
-                
-            # else:
-            #     dropout = settings["dropout"]
-
             # Creates mini batches
             batches = minibatch(training_data, size=batch_size)
             num_batches = 0    

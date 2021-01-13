@@ -205,7 +205,7 @@ def save_csv_history(filename="history.csv", session=""):
     path = f"history/{filename}"
     logger.info("\n\n")
     logger.info(f"[save_csv_history] 💾 Saving history in a {path} file")
-    # create file if not exisys
+    # create file if not exists
     if not os.path.exists(path):
       with open(path, 'w'): pass
 
