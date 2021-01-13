@@ -1,0 +1,55 @@
+{
+  "example": {
+    "path_data_training": "data/your_train_data.json",
+    "path_data_validation": "data/your_validation_data.json",
+    "is_raw": false,
+    "train_subset": 0,
+    "model_path": "models/your_base_model/",
+    "save_model_path": "models/best",
+    "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
+    "threshold": 80,
+    "epochs": 20,
+    "optimizer": {"lr": 0.05},
+    "dropout": 0.25,
+    "batch_size":{"f": "compounding", "from": 6.0, "to": 12.0, "rate": 1.5},
+    "callbacks": {
+      "on_iteration":[
+        {"f": "print_scores_on_epoch"},
+        {"f": "save_best_model", "path_best_model": "models/best", "threshold": 80},
+        {"f": "reduce_lr_on_plateau", "epochs": 3, "diff": 1, "step": 0.001},
+        {"f": "early_stop", "epochs": 10, "diff": 2},
+        {"f": "update_best_scores"},
+        {"f": "sleep", "secs": 1, "log": true} 
+      ],
+      "on_batch":[{"f": "sleep", "secs": 1}],
+      "on_stop":[
+        {"f": "log_best_scores"},
+        {"f": "save_csv_history"}
+      ]
+    }
+  },
+
+  "another_config": {
+    "path_data_training": "data/your_train_data.json",
+    "path_data_validation": "data/your_validation_data.json",
+    "is_raw": false,
+    "train_subset": 0,
+    "model_path": "models/your_base_model/",
+    "save_model_path": "models/best",
+    "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
+    "threshold": "80",
+    "epochs": 40,
+    "optimizer": {},
+    "dropout": {},
+    "batch_size":{},
+    "callbacks": {
+      "on_iteration":[
+        {"f": "print_scores_on_epoch"},
+        {"f": "update_best_scores"},
+        {"f": "sleep", "secs": 1, "log": true} 
+      ],
+      "on_batch":[],
+      "on_stop":[]
+    }
+  }
+}

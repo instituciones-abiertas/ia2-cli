@@ -4,12 +4,18 @@
 # Training and Output data
 data
 output
+history
+
+train_config.json
 
 # Spacy Models
 models
 
 # Misc
 __pycache__
+
+# Logs
+logs
 
 # Virtualenv
 /venv

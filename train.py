@@ -10,6 +10,7 @@ import re
 import sys
 import subprocess
 import spacy
+import time
 from spacy.util import minibatch, compounding, filter_spans, decaying
 from spacy.gold import biluo_tags_from_offsets
 from spacy.scorer import Scorer
@@ -17,6 +18,8 @@ from spacy.gold import GoldParse, docs_to_json
 import srsly
 from os import listdir
 from os.path import isfile, join
+from callbacks import (print_scores_on_epoch, save_best_model, reduce_lr_on_plateau,
+    early_stop, update_best_scores, sleep, log_best_scores, save_csv_history, change_dropout_fixed)
 
 logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
@@ -25,9 +28,6 @@ logger_fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s")
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
-
-# Sets a global default value for DROPOUT_RATE
-DROPOUT_RATE = 0.20
 
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
@@ -180,7 +180,64 @@ class SpacyUtils:
             pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
         logger.info(f'Succesfully converted data at "{output_file_path}".')
 
-    def convert_dataturks_to_training_cli(self, input_files_path: str, entities: list, output_file_path: str):
+    def convert_dataturks_to_train_file(self,
+        input_files_path: str,
+        entities: list,
+        output_file_path: str,
+        num_files: int = 0
+    ):
+        """
+        Given an input directory and a list of entities, converts every .json
+        file from the directory into a single .json to be used with train_model
+        method. Unlike convert_dataturks_to_training_cli this does not convert
+        documents to Spacy JSON format used in Spacy cli train command.
+        Writes it out to the given output directory.
+
+        :param input_files_path: Directory pointing to dataturks .json files to
+        be converted.  
+        :param entities: A list of entities, separated by comma, to be
+        considered during annotations extraction from each dadaturks batch.  
+        :param output_file_path: The path and name of the output file.
+        :param num_files An integer which means the numbers of files from
+        input path to be included. 0 means all files and is default option
+        """
+        
+        TRAIN_DATA = []
+        begin_time = datetime.datetime.now()
+        input_files = [
+            f
+            for f in listdir(input_files_path)
+            if isfile(join(input_files_path, f))
+        ]
+
+        if num_files == 0:
+            num_files = len(input_files)
+
+        for input_file in input_files[:num_files]:
+            logger.info(f"Extracting raw data and occurrences from file: \"{input_file}\"...")
+            extracted_data = convert_dataturks_to_spacy(
+                f"{input_files_path}/{input_file}",
+                entities
+            )
+            TRAIN_DATA = TRAIN_DATA + extracted_data
+            logger.info(f"Finished extracting data from file \"{input_file}\".")
+
+        diff = datetime.datetime.now() - begin_time
+        logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
+        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")   
+        try:
+            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")            
+            srsly.write_json(output_file_path, TRAIN_DATA)            
+            logger.info("💾 Done.")
+        except Exception:
+            logging.exception(f"An error occured writing the output file at \"{output_file_path}\".")
+
+
+    def convert_dataturks_to_training_cli(self,
+        input_files_path: str,
+        entities: list,
+        output_file_path: str
+    ):
         """
         Given an input directory and a list of entities, converts every .json
         file from the directory into a single .json recognisable by Spacy and
@@ -249,81 +306,271 @@ class SpacyUtils:
     # Model Training functions
     # =================================
 
-    def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
-        for batch in batches:
-            texts, annotations = zip(*batch)
+#FIXME no se está usando esta función
+    # def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
+        # for batch in batches:
+            # texts, annotations = zip(*batch)
 
-            nlp.update(
-                texts,  # batch of raw texts
-                annotations,  # batch of annotations
-                drop=DROPOUT_RATE,
-                losses=losses,
-                sgd=optimizer,
-            )
-        logger.info(f"⬇️ Losses rate: [{losses}]")
-        try:
-            numero_losses = losses.get("ner")
-            if numero_losses < best and numero_losses > 0:
-                best = numero_losses
-                nlp.to_disk(path_best_model)
-                logger.info(f"💾 Saving model with losses: [{best}]")
+            # nlp.update(
+                # texts, # batch of raw texts
+                # annotations, # batch of annotations
+                # drop=DROPOUT_RATE,
+                # losses=losses,
+                # sgd=optimizer,
+            # )
+        # logger.info(f"⬇️ Losses rate: [{losses}]")
+        # try:
+            # numero_losses = losses.get("ner")
+            # if numero_losses < best and numero_losses > 0:
+                # best = numero_losses
+                # nlp.to_disk(path_best_model)
+                # logger.info(f"💾 Saving model with losses: [{best}]")
 
-        except Exception:
-            logger.exception("The batch has no training data.")
+        # except Exception:
+            # logger.exception("The batch has no training data.")
 
-        return best
+        # return best
 
-    def get_best_model(self, optimizer, nlp, n_iter, training_data, best, path_best_model, disabled_pipes):
-        early_stop = 0
-        not_improve = 30
-        itn = 0
+    def save_state_history(self, state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, learn_rate, num_batches, dropout):
+        state["history"]["ner"].append(numero_losses)
+        state["history"]["f_score"].append(f_score)
+        state["history"]["recall"].append(recall_score)
+        state["history"]["precision"].append(precision_score)
+        state["history"]["per_type_score"].append(per_type_score)
 
-        while itn <= n_iter:
+        #validation
+        state["history"]["val_f_score"].append(val_f_score)
+        state["history"]["val_recall"].append(val_recall_score)
+        state["history"]["val_precision"].append(val_precision_score)
+        state["history"]["val_per_type_score"].append(val_per_type_score)
+
+        state["history"]["lr"].append(learn_rate)
+        state["history"]["batches"].append(num_batches)
+        state["history"]["dropout"].append(dropout)      
+
+
+    def get_best_model(self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}):
+        init_time = time.time()
+        print("\nsettings", settings)
+        
+        state = {
+            "i": 0,
+            "epochs": n_iter,
+            "train_size": len(training_data),
+            "history": {
+                "ner": [],
+                "f_score": [],
+                "recall": [],
+                "precision": [],
+                "per_type_score": [],
+                "val_f_score": [],
+                "val_recall": [],
+                "val_precision": [],
+                "val_per_type_score": [],
+                "lr": [],
+                "batches": [],  # processed batches
+                "dropout": []
+            },
+            "min_ner": 0,
+            "max_f_score": 0,
+            "max_recall": 0,
+            "max_precision": 0,
+            "max_val_f_score": 0,
+            "max_val_recall": 0,
+            "max_val_precision": 0,
+            "lr": settings["lr"],
+            "beta1": settings["beta1"],
+            "dropout": settings["dropout"],
+            "elapsed_time": 0,
+            "stop": False
+        }
+
+        print(state)
+
+        # callback 
+        # callbacks["on_iteration"].append(update_best_scores())
+
+        # for validation    
+        val_texts, val_annotations = zip(*validation_data)
+        tr_texts, tr_annotations = zip(*training_data)
+
+        while not state["stop"] and state["i"] < state["epochs"]:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
+
+            # set/update Adam optimizer from state
+            optimizer.learn_rate = state["lr"]
+            optimizer.beta1 = state["beta1"]
+
+            if  len(settings["batch_args"]) > 0:   
+                batch_size = settings["batch_size"](*settings["batch_args"]) 
+            else:
+                batch_size = settings["batch_size"]
+
             # Creates mini batches
-            batches = minibatch(training_data, size=compounding(4.0, 32.0, 1.001))
-
+            batches = minibatch(training_data, size=batch_size)
+            num_batches = 0    
+            bz = []
             for batch in batches:
+                num_batches += 1
                 texts, annotations = zip(*batch)
-
+                
+                bz.append(len(texts))
                 nlp.update(
-                    texts,  # batch of raw texts
-                    annotations,  # batch of annotations
-                    drop=DROPOUT_RATE,
+                    texts, # batch of raw texts
+                    annotations, # batch of annotations
+                    drop=state["dropout"],
                     losses=losses,
                     sgd=optimizer,
                 )
+
+                # run batch callbacks
+                for cb in callbacks["on_batch"]:
+                    state = cb(state, logger, nlp, optimizer)
+                
             try:
-                f_score, precision_score, recall_score = self.evaluate_multiple(optimizer, nlp, texts, annotations)
-                # print(f"f-score: {f_score} -  precision: {precision_score} - recall: {recall_score}")
+                print(bz)
+                # compute validation scores
+                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
+                
+                # train data score
+                f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)                
                 numero_losses = losses.get("ner")
-                if numero_losses < best and numero_losses > 0:
-                    # if f_score >= best_f_score and f_score > 0: #TODO we should define which metric to use
-                    early_stop = 0
-                    best = numero_losses
-                    with nlp.use_params(optimizer.averages):
-                        disabled_pipes.restore()
-                        nlp.to_disk(path_best_model)
-                    logger.info(
-                        f"💾 Saving model with f1-score {f_score}, losses: {numero_losses} and recall: {recall_score}"
-                    )
-                else:
-                    early_stop += 1
 
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            logger.info(f"Losses rate: {losses}, f1-score: {f_score}, early_stop: {early_stop}")
+            self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, optimizer.learn_rate, num_batches, state["dropout"])
 
-            if early_stop >= not_improve:
-                print("This batch is not improving enough, stopping training with it")
-                logger.info("This batch is not improving enough, stopping training with it")
-                break
-            itn += 1
+            # run callbacks after each iteration
+               
+            for cb in callbacks["on_iteration"]:
+                state = cb(state, logger, nlp, optimizer)
 
-        return best
+            state["i"] += 1
+
+        # Run callbacks after train loop
+        state["elapsed_time"] = (time.time() - init_time)/60
+        for cb in callbacks["on_stop"]:
+            state = cb(state, logger, nlp, optimizer)
+
+
+    def set_lr_and_beta1(self, train_config):
+        # Adam settings and defaults
+        if not "optimizer" in train_config:
+            lr = 0.004
+            beta1 = 0.9 
+        else:
+            if "lr" in train_config["optimizer"]:
+                lr = train_config["optimizer"]["lr"]
+            else:
+                lr = 0.004
+            
+            if "beta1" in train_config["optimizer"]:
+                beta1 = train_config["optimizer"]["beta1"]
+            else:
+                beta1 = 0.9
+        return lr, beta1
+
+    def set_dropout(self, train_config, FUNC_MAP):
+        # TODO NOT working with decaying 
+        if not "dropout" in train_config:
+            return 0.2
+        else:   
+            if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
+                return train_config["dropout"]
+            else:
+                d = train_config["dropout"]
+                return FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
+
+
+    def set_batch_size(self, train_config, FUNC_MAP):
+        if not "batch_size" in train_config:
+            return 4, ()
+        else:   
+            if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
+                return train_config["batch_size"], ()
+            else:
+                b = train_config["batch_size"]
+                return (FUNC_MAP[b.pop("f")], (b["from"], b["to"], b["rate"]))        
+
+
+    def train(self, config: str):
+        """
+        Runs the train_model method using the selected configuration from train_config.json
+        :param config the train configuration name
+        """
+        FUNC_MAP = {
+            "save_best_model": save_best_model, 
+            "reduce_lr_on_plateau": reduce_lr_on_plateau,
+            "early_stop": early_stop, 
+            "update_best_scores": update_best_scores, 
+            "log_best_scores": log_best_scores,
+            "save_csv_history": save_csv_history,
+            "sleep": sleep,
+            "print_scores_on_epoch": print_scores_on_epoch,
+            "change_dropout_fixed": change_dropout_fixed,
+            # spacy funcs
+            "compounding": compounding,
+            "decaying": decaying
+        }
+        try:
+            with open("train_config.json") as f:
+                train_config = json.load(f)
+                train_config = train_config[config]
+
+            # train settings
+            lr, beta1 = self.set_lr_and_beta1(train_config)
+            dropout = self.set_dropout(train_config, FUNC_MAP)
+            batch_size, batch_args = self.set_batch_size(train_config, FUNC_MAP)
+
+            s = {
+                "lr": lr,
+                "beta1": beta1,
+                "dropout": dropout,
+                # "dropout_args": dropout_args,
+                "batch_size": batch_size,
+                "batch_args": batch_args
+            }
+
+            on_iter_cb = []
+            for cb in train_config["callbacks"]["on_iteration"]:
+                on_iter_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+
+            on_batch_cb = []
+            for cb in train_config["callbacks"]["on_batch"]:
+                on_batch_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+
+            on_stop_cb = []
+            for cb in train_config["callbacks"]["on_stop"]:
+                on_stop_cb.append(FUNC_MAP[cb.pop("f")](**cb))
+                
+            c = {
+                "on_iteration": on_iter_cb,
+                "on_batch": on_batch_cb,
+                "on_stop": on_stop_cb
+            }
+            
+            
+        except Exception as e:
+            print(e)       
+
+        print(f"Training with {config} configuration")
+        
+        return self.train_model(        
+                train_config["path_data_training"],
+                train_config["epochs"],
+                train_config["model_path"],
+                train_config["entities"],
+                train_config["save_model_path"],
+                train_config["threshold"],
+                train_config["is_raw"],
+                train_config["path_data_validation"],
+                callbacks=c,
+                settings=s,
+                train_subset=train_config["train_subset"]
+            )  
 
     def train_model(
         self,
@@ -333,6 +580,11 @@ class SpacyUtils:
         ents: list,
         path_best_model: str,
         max_losses: float,
+        is_raw: bool =True,
+        path_data_validation: str ="",
+        callbacks={},
+        settings={},
+        train_subset=0
     ):
         """
         Given a dataturks .json format input file, a list of entities and a path
@@ -350,9 +602,25 @@ class SpacyUtils:
         trained model.
         :param max_losses: A float representing the maximum NER losses value
         to consider before start writing best models output.
+        :param is_raw A boolean that determines if the train file will be converteb        True by default
         """
-        best = max_losses
-        training_data = convert_dataturks_to_spacy(path_data_training, ents)
+
+        if is_raw:
+            logger.info(f"loading and converting training data from dataturks: {path_data_training}")
+            training_data = convert_dataturks_to_spacy(path_data_training, ents)
+            if path_data_validation != "":
+                validation_data = convert_dataturks_to_spacy(path_data_training, ents)
+        else:
+            logger.info(f"loading pre-converted training data JSON: {path_data_training}")
+            with open(path_data_training) as f:
+                training_data = json.load(f)
+            
+            if path_data_validation != "":
+                logger.info(f"loading pre-converted validation data JSON: {path_data_validation}")
+                with open(path_data_validation) as f:
+                    validation_data = json.load(f)
+                     
+        
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
@@ -370,68 +638,101 @@ class SpacyUtils:
         # Save disable pipelines
         disabled_pipes = nlp.disable_pipes(*other_pipes)
 
-        with warnings.catch_warnings():
+        
+        with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
             optimizer = nlp.begin_training()
-            best = self.get_best_model(optimizer, nlp, n_iter, training_data, best, path_best_model, disabled_pipes)
-            # Enable all pipes
-            disabled_pipes.restore()
+
+            # we save the first model and then we update it if there is a better version of it
+            logger.info(f"💾 Saving initial model")
             nlp.to_disk(model_path)
-            return best
 
-    def train_all_files_in_folder(
-        self,
-        training_files_path: str,
-        n_iter: int,
-        model_path: str,
-        entities: list,
-        best_model_path: str,
-        max_losses: float,
-    ):
-        """
-        Given the path to a dataturks .json format input file directory, a list
-        of entities and a path to an existent Spacy model, trains that model for
-        `n_iter` iterations with the given entities. Whenever a best model is
-        found it is writen to disk at the given output path.
+            # adding plugins for each step of train loop train loop
+            # these are default callbacks
+            if not bool(callbacks):
+                callbacks = {
+                    "on_batch": [sleep(secs=1)],
+                    "on_iteration": [
+                        
+                        print_scores_on_epoch(),
+                        save_best_model(path_best_model=path_best_model, threshold=max_losses),
+                        reduce_lr_on_plateau(epochs=3, diff=1, step=0.001),
+                        early_stop(epochs=10, diff=2),
+                        update_best_scores(),
+                        sleep(secs=3, log=True)
+                    ],
+                    "on_stop":[
+                        log_best_scores(),
+                        save_csv_history()
+                    ]
+                }
 
-        :param training_files_path: A string representing the path to the input
-        files directory.
-        :param n_iter: An integer representing a number of iterations.
-        :param model_path: A string representing the path to the model to train.
-        :param entities: A list of string representing the entities to consider
-        during training.
-        :param best_model_path: A string representing the path to write the best
-        trained model.
-        :param max_losses: A float representing the maximum NER losses value
-        to consider before start writing best models output.
-        """
-        begin_time = datetime.datetime.now()
-        onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
-        random.shuffle(onlyfiles)
+            # TODO default settings just in case not using train_config.json
+            
+            if train_subset > 0:
+                training_data = training_data[:train_subset]
+
+            self.get_best_model(optimizer, nlp, n_iter, training_data, path_best_model, validation_data=validation_data, callbacks=callbacks, settings=settings)
+
+
+# FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
+# de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
+# debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
+    # def train_all_files_in_folder(
+        # self,
+        # training_files_path: str,
+        # n_iter: int,
+        # model_path: str,
+        # entities: list,
+        # best_model_path: str,
+        # max_losses: float,
+    # ):
+        # """
+        # Given the path to a dataturks .json format input file directory, a list
+        # of entities and a path to an existent Spacy model, trains that model for
+        # `n_iter` iterations with the given entities. Whenever a best model is
+        # found it is writen to disk at the given output path.
+# 
+        # :param training_files_path: A string representing the path to the input
+        # files directory.  
+        # :param n_iter: An integer representing a number of iterations.  
+        # :param model_path: A string representing the path to the model to train.  
+        # :param entities: A list of string representing the entities to consider
+        # during training.  
+        # :param best_model_path: A string representing the path to write the best
+        # trained model.  
+        # :param max_losses: A float representing the maximum NER losses value
+        # to consider before start writing best models output.  
+        # """
+
+        # 
+        # begin_time = datetime.datetime.now()
+        # onlyfiles = [
+            # f
+            # for f in listdir(training_files_path)
+            # if isfile(join(training_files_path, f))
+        # ]
+        # random.shuffle(onlyfiles)
         # self.add_new_entity_to_model(entities, model_path)
-        # FIXME NO le damos bola al max_losses que viene por parámetro, sino a la mejora en losses
-        # se debería considerar refactorizar la forma en que iteramos => n_iter, files, minibatches
-        # de la manera actual no se puede hacer un early stopping ya que al procesar otro archivo,
-        # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-        best_losses = 300  # max_losses
-        processed_docs = 0
-        for file_name in onlyfiles:
-            logger.info(f'Started processing file at "{file_name}"...')
-            best_losses = self.train_model(
-                training_files_path + file_name,
-                n_iter,
-                model_path,
-                entities,
-                best_model_path,
-                best_losses,
-            )
-            processed_docs = processed_docs + 1
-            print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-            logger.info(f'Maximum considerable losses is "{best_losses}".')
-            logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
-        diff = datetime.datetime.now() - begin_time
-        logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
+        # best_losses = max_losses
+        # processed_docs = 0
+        # for file_name in onlyfiles:
+            # logger.info(f"Started processing file at \"{file_name}\"...")
+            # best_losses = self.train_model(
+                # training_files_path + file_name,
+                # n_iter,
+                # model_path,
+                # entities,
+                # best_model_path,
+                # best_losses,
+            # )
+            # processed_docs = processed_docs + 1
+            # print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
+            # logger.info(f"Maximum considerable losses is \"{best_losses}\".")
+            # logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
+        # diff = datetime.datetime.now() - begin_time
+        # logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
     # =================================
     # Evaluation and display functions
@@ -475,16 +776,27 @@ class SpacyUtils:
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
+        per_type_sum = 0
+        ents_per_type_sum = {}
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
                 scores = self.evaluate(nlp, text, entities_for_text)
-                recall_score_sum += scores.get("ents_r")
-                precision_score_sum += scores.get("ents_p")
-                f_score_sum += scores.get("ents_f")
-        # we are returning this 3 values to verify how the model goes
-        return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts)
+                recall_score_sum += scores.get('ents_r')
+                precision_score_sum += scores.get('ents_p')
+                f_score_sum += scores.get('ents_f')
+
+                for key, value in scores['ents_per_type'].items():
+                    if key not in ents_per_type_sum:
+                        ents_per_type_sum[key] = value['f']
+                    else:
+                        ents_per_type_sum[key] += value['f']
+
+        for key, value in ents_per_type_sum.items():
+            ents_per_type_sum[key] = value / len(texts)
+        
+        return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts), ents_per_type_sum
 
     def count_examples(self, files_path: str, entities: list):
         """
