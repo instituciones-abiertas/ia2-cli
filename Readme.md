@@ -2,7 +2,7 @@
 
 #### Stack
 
-- Phython
+- Python
 - [Fire](https://github.com/google/python-fire)
 - [Spacy](https://spacy.io/)
 
