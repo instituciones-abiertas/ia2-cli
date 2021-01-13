@@ -44,7 +44,7 @@ def print_scores_on_epoch():
 def save_best_model(path_best_model="", threshold=40, score="val_f_score"):
   """
   Save the model if the epoch score is more than the threshold
-  and if current score is a new max 
+  and if current score is a new max
   """
   def save_best_model_cb(state, logger, model, optimizer):
     # print(f"last f1: {state['history'][score][-1]} | max: {state['max_'+score]} | threshold: {threshold}")
@@ -54,7 +54,7 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score"):
             model.to_disk(path_best_model)
             logger.info(f"💾 Saving model for epoch {e}")
 
-    return state  
+    return state
 
   return save_best_model_cb
 
@@ -74,9 +74,9 @@ def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last
   def reduce_lr_on_plateau_cb(state, logger, model, optimizer):
     if len(state["history"][score]) > epochs and state["lr"] > step:
       delta = np.diff(state["history"][score])[-epochs:]
-     
+
       if np.mean(delta) < diff:
-        # maybe you have been getting bad scores but the last epoch shed a glimmer of hope 
+        # maybe you have been getting bad scores but the last epoch shed a glimmer of hope
         if last_chance and delta[-1] > 0:
           logger.info(f"[reduce_lr_on_plateau] Positive rate 🛫! waiting a bit more until touch learning rate")
         else:
@@ -101,10 +101,10 @@ def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
   def early_stop_cb(state, logger, model, optimizer):
     if len(state["history"][score]) > epochs:
       delta = np.diff(state["history"][score])[-epochs:]
-      
+
       print(delta, " - suma de diff: ", np.sum(delta))
       if np.sum(delta) < diff:
-        # maybe you have been getting bad scores but the last epoch shed a glimmer of hope 
+        # maybe you have been getting bad scores but the last epoch shed a glimmer of hope
         if last_chance and delta[-1] > 0:
           logger.info(f"[early_stop] Positive rate 🛫! One more chance")
         else:
@@ -154,7 +154,7 @@ def change_dropout_fixed(step=0.01, until=0.5):
   [experimental] change the dropout each epoch
   """
   def change_dropout_fixed_cb(state, logger, model, optimizer):
-    
+
     state["dropout"]
     if  step > 0 and state["dropout"] < until:
       state["dropout"] += step
@@ -189,7 +189,7 @@ def log_best_scores():
     logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
     logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
     logger.info(f"F-SCORE -> max {state['max_f_score']} | val max {state['max_val_f_score']}")
-    
+
     return state
 
   return log_best_scores_cb
@@ -212,7 +212,7 @@ def save_csv_history(filename="history.csv", session=""):
     # give a session name if not given
     if session == "":
       now = datetime.now()
-      s = now.strftime("%Y%m%d%H%M%S")      
+      s = now.strftime("%Y%m%d%H%M%S")
     else:
       s = session
 
@@ -240,7 +240,7 @@ def save_csv_history(filename="history.csv", session=""):
         "val_per_type_score": state["history"]["val_per_type_score"][i],
       })
 
-    # opening the csv file in 'w' mode 
+    # opening the csv file in 'w' mode
     file = open(path, 'w', newline ='')
     with file:
       writer = csv.DictWriter(file, fieldnames = header)

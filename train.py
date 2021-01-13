@@ -194,14 +194,14 @@ class SpacyUtils:
         Writes it out to the given output directory.
 
         :param input_files_path: Directory pointing to dataturks .json files to
-        be converted.  
+        be converted.
         :param entities: A list of entities, separated by comma, to be
-        considered during annotations extraction from each dadaturks batch.  
+        considered during annotations extraction from each dadaturks batch.
         :param output_file_path: The path and name of the output file.
         :param num_files An integer which means the numbers of files from
         input path to be included. 0 means all files and is default option
         """
-        
+
         TRAIN_DATA = []
         begin_time = datetime.datetime.now()
         input_files = [
@@ -224,10 +224,10 @@ class SpacyUtils:
 
         diff = datetime.datetime.now() - begin_time
         logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
-        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")   
+        logger.info(f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format...")
         try:
-            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")            
-            srsly.write_json(output_file_path, TRAIN_DATA)            
+            logger.info(f"💾 Writing final output at \"{output_file_path}\"...")
+            srsly.write_json(output_file_path, TRAIN_DATA)
             logger.info("💾 Done.")
         except Exception:
             logging.exception(f"An error occured writing the output file at \"{output_file_path}\".")
@@ -346,13 +346,13 @@ class SpacyUtils:
 
         state["history"]["lr"].append(learn_rate)
         state["history"]["batches"].append(num_batches)
-        state["history"]["dropout"].append(dropout)      
+        state["history"]["dropout"].append(dropout)
 
 
     def get_best_model(self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}):
         init_time = time.time()
         print("\nsettings", settings)
-        
+
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -387,10 +387,10 @@ class SpacyUtils:
 
         print(state)
 
-        # callback 
+        # callback
         # callbacks["on_iteration"].append(update_best_scores())
 
-        # for validation    
+        # for validation
         val_texts, val_annotations = zip(*validation_data)
         tr_texts, tr_annotations = zip(*training_data)
 
@@ -403,19 +403,19 @@ class SpacyUtils:
             optimizer.learn_rate = state["lr"]
             optimizer.beta1 = state["beta1"]
 
-            if  len(settings["batch_args"]) > 0:   
-                batch_size = settings["batch_size"](*settings["batch_args"]) 
+            if  len(settings["batch_args"]) > 0:
+                batch_size = settings["batch_size"](*settings["batch_args"])
             else:
                 batch_size = settings["batch_size"]
 
             # Creates mini batches
             batches = minibatch(training_data, size=batch_size)
-            num_batches = 0    
+            num_batches = 0
             bz = []
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
-                
+
                 bz.append(len(texts))
                 nlp.update(
                     texts, # batch of raw texts
@@ -428,14 +428,14 @@ class SpacyUtils:
                 # run batch callbacks
                 for cb in callbacks["on_batch"]:
                     state = cb(state, logger, nlp, optimizer)
-                
+
             try:
                 print(bz)
                 # compute validation scores
-                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)                
-                
+                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(optimizer, nlp, val_texts, val_annotations)
+
                 # train data score
-                f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)                
+                f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(optimizer, nlp, tr_texts, tr_annotations)
                 numero_losses = losses.get("ner")
 
             except Exception:
@@ -444,7 +444,7 @@ class SpacyUtils:
             self.save_state_history(state, numero_losses, f_score, recall_score, precision_score, per_type_score, val_f_score, val_recall_score, val_precision_score, val_per_type_score, optimizer.learn_rate, num_batches, state["dropout"])
 
             # run callbacks after each iteration
-               
+
             for cb in callbacks["on_iteration"]:
                 state = cb(state, logger, nlp, optimizer)
 
@@ -460,13 +460,13 @@ class SpacyUtils:
         # Adam settings and defaults
         if not "optimizer" in train_config:
             lr = 0.004
-            beta1 = 0.9 
+            beta1 = 0.9
         else:
             if "lr" in train_config["optimizer"]:
                 lr = train_config["optimizer"]["lr"]
             else:
                 lr = 0.004
-            
+
             if "beta1" in train_config["optimizer"]:
                 beta1 = train_config["optimizer"]["beta1"]
             else:
@@ -474,10 +474,10 @@ class SpacyUtils:
         return lr, beta1
 
     def set_dropout(self, train_config, FUNC_MAP):
-        # TODO NOT working with decaying 
+        # TODO NOT working with decaying
         if not "dropout" in train_config:
             return 0.2
-        else:   
+        else:
             if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
                 return train_config["dropout"]
             else:
@@ -488,12 +488,12 @@ class SpacyUtils:
     def set_batch_size(self, train_config, FUNC_MAP):
         if not "batch_size" in train_config:
             return 4, ()
-        else:   
+        else:
             if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
                 return train_config["batch_size"], ()
             else:
                 b = train_config["batch_size"]
-                return (FUNC_MAP[b.pop("f")], (b["from"], b["to"], b["rate"]))        
+                return (FUNC_MAP[b.pop("f")], (b["from"], b["to"], b["rate"]))
 
 
     def train(self, config: str):
@@ -502,10 +502,10 @@ class SpacyUtils:
         :param config the train configuration name
         """
         FUNC_MAP = {
-            "save_best_model": save_best_model, 
+            "save_best_model": save_best_model,
             "reduce_lr_on_plateau": reduce_lr_on_plateau,
-            "early_stop": early_stop, 
-            "update_best_scores": update_best_scores, 
+            "early_stop": early_stop,
+            "update_best_scores": update_best_scores,
             "log_best_scores": log_best_scores,
             "save_csv_history": save_csv_history,
             "sleep": sleep,
@@ -545,20 +545,20 @@ class SpacyUtils:
             on_stop_cb = []
             for cb in train_config["callbacks"]["on_stop"]:
                 on_stop_cb.append(FUNC_MAP[cb.pop("f")](**cb))
-                
+
             c = {
                 "on_iteration": on_iter_cb,
                 "on_batch": on_batch_cb,
                 "on_stop": on_stop_cb
             }
-            
-            
+
+
         except Exception as e:
-            print(e)       
+            print(e)
 
         print(f"Training with {config} configuration")
-        
-        return self.train_model(        
+
+        return self.train_model(
                 train_config["path_data_training"],
                 train_config["epochs"],
                 train_config["model_path"],
@@ -570,7 +570,7 @@ class SpacyUtils:
                 callbacks=c,
                 settings=s,
                 train_subset=train_config["train_subset"]
-            )  
+            )
 
     def train_model(
         self,
@@ -614,13 +614,13 @@ class SpacyUtils:
             logger.info(f"loading pre-converted training data JSON: {path_data_training}")
             with open(path_data_training) as f:
                 training_data = json.load(f)
-            
+
             if path_data_validation != "":
                 logger.info(f"loading pre-converted validation data JSON: {path_data_validation}")
                 with open(path_data_validation) as f:
                     validation_data = json.load(f)
-                     
-        
+
+
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
@@ -638,7 +638,7 @@ class SpacyUtils:
         # Save disable pipelines
         disabled_pipes = nlp.disable_pipes(*other_pipes)
 
-        
+
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
@@ -654,7 +654,7 @@ class SpacyUtils:
                 callbacks = {
                     "on_batch": [sleep(secs=1)],
                     "on_iteration": [
-                        
+
                         print_scores_on_epoch(),
                         save_best_model(path_best_model=path_best_model, threshold=max_losses),
                         reduce_lr_on_plateau(epochs=3, diff=1, step=0.001),
@@ -669,7 +669,7 @@ class SpacyUtils:
                 }
 
             # TODO default settings just in case not using train_config.json
-            
+
             if train_subset > 0:
                 training_data = training_data[:train_subset]
 
@@ -677,7 +677,7 @@ class SpacyUtils:
 
 
 # FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
-# de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo, 
+# de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo,
 # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
     # def train_all_files_in_folder(
         # self,
@@ -693,20 +693,20 @@ class SpacyUtils:
         # of entities and a path to an existent Spacy model, trains that model for
         # `n_iter` iterations with the given entities. Whenever a best model is
         # found it is writen to disk at the given output path.
-# 
+#
         # :param training_files_path: A string representing the path to the input
-        # files directory.  
-        # :param n_iter: An integer representing a number of iterations.  
-        # :param model_path: A string representing the path to the model to train.  
+        # files directory.
+        # :param n_iter: An integer representing a number of iterations.
+        # :param model_path: A string representing the path to the model to train.
         # :param entities: A list of string representing the entities to consider
-        # during training.  
+        # during training.
         # :param best_model_path: A string representing the path to write the best
-        # trained model.  
+        # trained model.
         # :param max_losses: A float representing the maximum NER losses value
-        # to consider before start writing best models output.  
+        # to consider before start writing best models output.
         # """
 
-        # 
+        #
         # begin_time = datetime.datetime.now()
         # onlyfiles = [
             # f
@@ -795,7 +795,7 @@ class SpacyUtils:
 
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
-        
+
         return f_score_sum / len(texts), precision_score_sum / len(texts), recall_score_sum / len(texts), ents_per_type_sum
 
     def count_examples(self, files_path: str, entities: list):
