@@ -224,3 +224,26 @@ python train.py run_command_with_timer "command_to_run"
    --n-iter=2 \
    --base-model modelos/modelo10-12"
 ```
+
+#### Desplegar modelo
+
+Este script **deploy_model.sh** se encarga de:
+- Agregar **3 elementos al pipeline** (en orden y luego del NER)
+- Agregar modificaciones al código fuente del modelo agregando Language factories para cada componente
+- Generar un archivo tar.gz dentro de **/dist** (para luego instalar mediante `pip install modelo`)
+
+Pipelines agregados:
+- EntityRuler (entity_ruler.py)
+- EntityMatcher (entity_matcher.py)
+- EntityCustom (entoty_custom.py)
+
+Ejemplo de uso:
+```
+./deploy_model.sh es_core_news_lg juzgado10 1.0 ./pipeline_components
+```
+
+Parametros en orden:
+- MODELO_ORIGEN: nombre o directorio del modelo de origen
+- MODELO_NOMBRE: nombre del nuevo modelo a crear
+- MODELO_VERSION: versión del modelo a crear
+- MODELO_COMPONENTES: directorio donde estan los archivos de componentes (entity_ruler.py, entity_matcher.py, entity_custom.py)
