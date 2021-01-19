@@ -209,22 +209,34 @@ class SpacyUtils:
         package_dir = package_name + "-" + nlp.meta["version"]
         package_base_path = os.path.join(package_path, package_dir, package_name)
 
+        # Copio archivos con modulos custom al directorio pipe_components (no uso model_components para que sea fijo y siempre el mismo en nuestro componente, y asi poder desacoplarlo de cuando tengamos multiples clientes
+        package_components_dir = "pipeline_components"
         files_src = ["entity_matcher.py", "entity_custom.py"]
-        dest_component_dir = os.path.join(package_base_path, package_dir, model_components)
+        dest_component_dir = os.path.join(package_base_path, package_dir, package_components_dir)
         os.mkdir(dest_component_dir)
         for f in files_src:
             dest = os.path.join(dest_component_dir, f)
             orig = os.path.join(model_components, f)
             shutil.copyfile(orig, dest)
 
-        import_line_1 = "from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns\n"
-        import_line_2 = "from pipeline_components.entity_custom import EntityCustom\n"
-        import_line_3 = "from spacy.language import Language\n"
-        factory_1 = (
-            "Language.factories['entity_matcher'] = lambda nlp, **cfg: EntityMatcher(nlp, matcher_patterns,**cfg)\n"
-        )
-        factory_2 = "Language.factories['entity_custom'] = lambda nlp, **cfg: EntityCustom(nlp,**cfg)\n"
-        new_code = [factory_2, factory_1, import_line_3, import_line_2, import_line_1]
+        new_code = f"""
+import os
+import importlib
+from spacy.language import Language
+def import_path(path):
+    module_name = os.path.basename(path).replace('-', '_').replace('.','-')
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+dir =  os.fspath(Path(__file__).parent)
+moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
+moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
+
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
+        """
 
         insert_line = 6
         package_filename = "__init__.py"
@@ -232,10 +244,10 @@ class SpacyUtils:
         with open(init_py, "r") as f:
             content = f.readlines()
         with open(init_py, "w") as f:
-            for c in new_code:
-                content.insert(insert_line, c)
+            for c in new_code.splitlines()[::-1]:
+                content.insert(insert_line, c + "\n")
             f.writelines(content)
-        logger.info(f"Succesfully write language factories to model")
+        logger.info("Succesfully write language factories to model")
 
     # =================================
     # Data Conversion functions
