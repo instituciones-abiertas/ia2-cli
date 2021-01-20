@@ -19,3 +19,6 @@ logs
 
 # Virtualenv
 /venv
+
+# Dist
+dist
