@@ -1,3 +1,27 @@
+import os
+import re
+import json
+import spacy
+import shutil
+import logging
+import datetime
+import subprocess
+from os import listdir
+from os.path import isfile, join
+from spacy.cli import package
+from spacy.pipeline import EntityRuler
+from pipeline_components.entity_ruler import ruler_patterns
+from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns
+from pipeline_components.entity_custom import EntityCustom
+
+logger = logging.getLogger("Spacy cli util")
+logger.setLevel(logging.DEBUG)
+logger_fh = logging.FileHandler("logs/debug.log")
+logger_fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s")
+logger_fh.setFormatter(formatter)
+logger.addHandler(logger_fh)
+
 def build_model_package(
     model_path: str, package_path: str, model_name: str, model_version: str, model_components: str
 ):
@@ -143,6 +167,49 @@ def save_state_history(
   state["history"]["lr"].append(learn_rate)
   state["history"]["batches"].append(num_batches)
   state["history"]["dropout"].append(dropout)
+
+
+def show_text(files_path: str, entity: str, context_words=0):
+  """
+  Given the path to a dataturks .json format input file directory and an
+  entity name, prints the annotation text from label.
+
+  :param files_path: Directory pointing to dataturks .json files
+  :param entity: entity label name.
+  """
+  files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
+  texts = []
+
+  for file_ in files:
+      with open(file_, "r") as f:
+          lines = f.readlines()
+          for line in lines:
+              data = json.loads(line)
+              for a in data["annotation"] or []:
+                  output = ""
+                  if a["label"][0] == entity:
+                      if not a["points"][0]["text"] in texts:
+                          text = a["points"][0]["text"]
+                          if context_words:
+                              text = re.escape(a["points"][0]["text"])
+                              interval = r"{{0,{0}}}".format(context_words)
+                              regex = (
+                                  r"((?:\S+\s+)"
+                                  + interval
+                                  + r"\b"
+                                  + text
+                                  + r"\b\s*(?:\S+\b\s*)"
+                                  + interval
+                                  + ")"
+                              )
+                              x = re.search(regex, data["content"])
+                              if x:
+                                  output = x.group()
+                          else:
+                              output = text
+                          texts.append(output)
+  for text in texts:
+      print(text)
 
 
 def run_command_with_timer(*args):

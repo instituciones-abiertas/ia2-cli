@@ -91,7 +91,7 @@ El archivo de configuración `train_config.json` se debe generar a partir de `ex
 - `path_data_training`: directorio de la data para entrenar el modelo 
 - `path_data_validation`: directorio de la data para entrenar el modelo
 - `is_raw`: valor booleano que determina si el archivo será convertido (cuando is_raw sea True)
-- `train_subset`:  #TODO para qué se usa? 
+- `train_subset`:  si el valor es diferente de cero, se usará un subset del dataset (número entero)
 - `model_path`: directorio del modelo custom a utilizar
 - `save_model_path`: directorio donde se guardará el modelo generado a partir del entrenamiento
 - `entities`: entidadas a ser usadas para el entrenamiento.

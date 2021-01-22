@@ -8,17 +8,14 @@ import datetime
 import os
 import re
 import sys
-import subprocess
 import spacy
 import time
-from spacy.util import minibatch, compounding, filter_spans, decaying
-from spacy.gold import biluo_tags_from_offsets
+import utils
+from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
-from spacy.gold import GoldParse, docs_to_json
-from spacy.pipeline import EntityRuler
+from spacy.gold import GoldParse
 from spacy.cli import package
 import srsly
-import utils
 from os import listdir
 from os.path import isfile, join
 from callbacks import (
@@ -32,10 +29,6 @@ from callbacks import (
     save_csv_history,
     change_dropout_fixed,
 )
-from pipeline_components.entity_ruler import ruler_patterns
-from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns
-from pipeline_components.entity_custom import EntityCustom
-import shutil
 
 
 logger = logging.getLogger("Spacy cli util")
