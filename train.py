@@ -673,6 +673,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             train_config["threshold"],
             train_config["is_raw"],
             train_config["path_data_validation"],
+            train_config["path_data_testing"],
             callbacks=c,
             settings=s,
             train_subset=train_config["train_subset"],
@@ -688,6 +689,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         max_losses: float,
         is_raw: bool = True,
         path_data_validation: str = "",
+        path_data_testing: str = "",
         callbacks={},
         settings={},
         train_subset=0,
@@ -714,8 +716,14 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         if is_raw:
             logger.info(f"loading and converting training data from dataturks: {path_data_training}")
             training_data = convert_dataturks_to_spacy(path_data_training, ents)
+
             if path_data_validation != "":
+                logger.info(f"loading and converting validation data from dataturks: {path_data_training}")
                 validation_data = convert_dataturks_to_spacy(path_data_training, ents)
+               
+            if path_data_testing != "":
+                logger.info(f"loading and converting testing data from dataturks: {path_data_training}")
+                testing_data = convert_dataturks_to_spacy(path_data_testing, ents)
         else:
             logger.info(f"loading pre-converted training data JSON: {path_data_training}")
             with open(path_data_training) as f:
@@ -725,6 +733,11 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 logger.info(f"loading pre-converted validation data JSON: {path_data_validation}")
                 with open(path_data_validation) as f:
                     validation_data = json.load(f)
+
+            if path_data_testing != "":
+                logger.info(f"loading pre-converted testing data JSON: {path_data_testing}")
+                with open(path_data_testing) as f:
+                    testing_data = json.load(f)        
 
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training

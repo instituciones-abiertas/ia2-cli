@@ -20,7 +20,7 @@ def example(param="value"):
 # iteration
 def print_scores_on_epoch():
   """
-  write the scores in the log file
+  write the scores/loss in the log file
   """
   def print_scores_cb(state, logger, model, optimizer):
     e = state["i"] + 1
@@ -33,7 +33,7 @@ def print_scores_on_epoch():
 
     logger.info("......................................................................")
     logger.info(f" Epoch N° {e}/{state['epochs']} | batches processed: {batches}")
-    logger.info(f"Losses rate: ner:{ner}, f1-score: {f_score}, precision: {precision_score}")
+    logger.info(f"Scores : NER loss:{ner}, f1-score: {f_score}, precision: {precision_score}")
     logger.info(f"Validation Losses rate: f1-score: {val_f_score}, precision: {val_precision_score}")
 
     return state
@@ -44,11 +44,16 @@ def print_scores_on_epoch():
 def save_best_model(path_best_model="", threshold=40, score="val_f_score"):
   """
   Save the model if the epoch score is more than the threshold
-  and if current score is a new max
+  or if current score is a new max.
+  #TODO include NER in the possible values
+
+  :param path_best_model where to save the model
+  :param threshold value to reach in order to save the first time
+  :param score value to be considered
   """
   def save_best_model_cb(state, logger, model, optimizer):
-    # print(f"last f1: {state['history'][score][-1]} | max: {state['max_'+score]} | threshold: {threshold}")
-    if (state["history"][score][-1] > threshold)  and  (state["history"][score][-1] > state["max_"+score]):
+    
+    if (state["history"][score][-1] >= threshold)  and  (state["history"][score][-1] > state["max_"+score]):
         e = state["i"]+1
         with model.use_params(optimizer.averages):
             model.to_disk(path_best_model)
@@ -69,7 +74,7 @@ def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last
   :param epochs last epochs to be considered
   :param diff score difference amount to produce a change in the the learning rate
   :param score score used to calculate the diff
-  :param last_chance give an extra oportunity if the last epoch has a positive diff
+  :param last_chance gives an extra oportunity if the last epoch has a positive diff
   """
   def reduce_lr_on_plateau_cb(state, logger, model, optimizer):
     if len(state["history"][score]) > epochs and state["lr"] > step:
@@ -96,7 +101,7 @@ def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
   :param epochs last epochs to be considered
   :param diff score difference amount to produce a change in the the learning rate
   :param score score used to calculate the diff
-  :param last_chance give an extra oportunity if the last epoch has a positive diff
+  :param last_chance gives an extra oportunity if the last epoch has a positive diff
   """
   def early_stop_cb(state, logger, model, optimizer):
     if len(state["history"][score]) > epochs:
@@ -152,6 +157,8 @@ def sleep(secs=0.5, log=False):
 def change_dropout_fixed(step=0.01, until=0.5):
   """
   [experimental] change the dropout each epoch
+  :param step amount to change per epoch
+  :param until limit for dropout change  
   """
   def change_dropout_fixed_cb(state, logger, model, optimizer):
 
@@ -177,7 +184,6 @@ def change_dropout_fixed(step=0.01, until=0.5):
 def log_best_scores():
   """
   Logs the max/mins from state
-  TODO add validation scores
   """
   def log_best_scores_cb(state, logger, model, optimizer):
     logger.info("\n\n")
@@ -185,7 +191,7 @@ def log_best_scores():
     e = state["i"]
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
     logger.info(f"elapsed time: {state['elapsed_time']} minutes")
-    logger.info(f"NER -> min {state['min_ner']}")
+    logger.info(f"NER loss -> min {state['min_ner']}")
     logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
     logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
     logger.info(f"F-SCORE -> max {state['max_f_score']} | val max {state['max_val_f_score']}")
