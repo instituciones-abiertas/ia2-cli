@@ -6,9 +6,18 @@ matcher_patterns = {
 }
 
 
-def not_in_nbor(ent, ent_name, word_list, neightbourPosition):
+def exist_n_token(token_id, n, maximo):
+    indice = token_id + n
+    return indice > 0 and indice <= maximo
+
+
+def not_in_nbor(maximo, ent, ent_name, word_list, nborPos):
     # el vecino no tienen una palabra que pertenezca a la lista dada
-    return ent.label_ == ent_name and ent[0].nbor(neightbourPosition).text not in word_list
+    return (
+        ent.label_ == ent_name
+        and exist_n_token(ent[0].i, nborPos, maximo)
+        and ent[0].nbor(nborPos).text not in word_list
+    )
 
 
 def overlap(span, span_list):
@@ -32,10 +41,12 @@ class EntityMatcher(object):
         matches = self.matcher(doc)
 
         for match_id, start, end in matches:
+            maximo = len(doc)
             label = self.nlp.vocab.strings[match_id]
             span = Span(doc, start, end, label)
 
             first_left_nbor = not_in_nbor(
+                maximo,
                 span,
                 "NUM",
                 [
@@ -58,14 +69,15 @@ class EntityMatcher(object):
                 -1,
             )
             second_left_nbor = not_in_nbor(
+                maximo,
                 span,
                 "NUM",
                 ["página", "pag", "p", "pág", "fs", "art", "arts", "inciso", "artículo", "artículos", "inc"],
                 -2,
             )
             first_right_nbor = not_in_nbor(
-                span, "NUM", ["inc", "hs", "horas", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"], 1
+                maximo, span, "NUM", ["inc", "hs", "horas", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"], 1
             )
-            if first_left_nbor and second_left_nbor and first_right_nbor and not overlap(span, doc.ents):
+            if (first_left_nbor or second_left_nbor or first_right_nbor) and not overlap(span, doc.ents):
                 doc.ents = list(doc.ents) + [span]
         return doc
