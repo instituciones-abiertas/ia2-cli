@@ -481,8 +481,8 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             "stop": False,
         }
 
-        print(state)
 
+        optimizer.L2 = 0.0
         # callback
         # callbacks["on_iteration"].append(update_best_scores())
 
@@ -769,9 +769,10 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 }
 
             # TODO default settings just in case not using train_config.json
-
             if train_subset > 0:
-                training_data = training_data[:train_subset]
+                training_data = random.sample(training_data, train_subset)
+                logger.info(f"Using a random subset of {train_subset} texts")
+
 
             self.get_best_model(
                 optimizer,
