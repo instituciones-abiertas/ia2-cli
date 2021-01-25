@@ -61,6 +61,38 @@ def is_prosecutor(ent):
     )
 
 
+def is_address(ent):
+    first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
+    second_left_nbors = [
+        "instalación",
+        "contramano",
+        "sita",
+        "sitas",
+        "sito",
+        "sitos",
+        "real",
+        "domiciliado",
+        "domiciliada",
+        "constituido",
+        "constituida",
+        "contramano",
+        "intersección",
+        "domicilio",
+        "ubicado",
+        "ubicada",
+        "real",
+    ]
+    first_token = ent[0]
+    last_token = ent[-1]
+
+    return ent.label_ in ["PER"] and (
+        first_token.nbor(-1).lower_ in first_left_nbors
+        or first_token.nbor(-2).lower_ in second_left_nbors
+        or last_token.like_num
+        or last_token.nbor().like_num
+    )
+
+
 def filter_spans(a_list, b_list):
     # filtra spans de a_list que se overlapeen con algun span de b_list
     def overlap(span, span_list):
@@ -98,6 +130,9 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="SECRETARIX"))
             if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="FISCAL"))
+            if not is_from_first_tokens(ent.start) and is_address(ent):
+                token_adicional = 1 if ent[-1].nbor().like_num else 0
+                new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
 
         if new_ents:
             filtered_ents = filter_spans(doc.ents, new_ents)
