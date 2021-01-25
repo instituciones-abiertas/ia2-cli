@@ -72,67 +72,36 @@ python train.py add_new_entity_to_model \
 modelos/modelo10-12 \
 ```
 
-#### Entrenar con un batch
+#### Entrenar un modelo
+Dicho entrenamiento guardará el mejor modelo (siempre que supere el threshold - leer parámetros de configuración), así como un archivo `history.csv` en la carpeta history (en la raiz del proyecto) en el que se explicitan parámetros y scores obtenidos por época (epoch).
 
-- `batch_path`: path de un archivo (`.json`) de entrenamiento.
-- `iter_n`: número de iteraciones por batch.
-- `model_path`: directorio del modelo custom a utilizar
-- `training_entities`: lista de entidades a entrenar
-- `output_path`: directorio donde se almacenará el modelo más óptimo
-- `max_losses`: (número flotante) Máximo valor de Losses soportado
+- `config_name`: nombre de la configuración que se usará para entrenar el modelo, dicha debería estar en un archivo de configuración con el nombre `train_config.json`. 
 
 ```bash
-python train.py train_model \
-  <batch_path> \
-  <iter_n> \
-  <model_path> \
-  <training_entities> \
-  <output_path> \
-  <max_losses>
+python train.py train <config_name>
 ```
 
 **Ejemplo:**
 
 ```bash
-python train.py train_model \
-  data/training/batches-2020-11-24/Batch_6.json \
-  2 \
-  models/base/2020-12-01 \
-  "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO"
-  models/best/2020-12-01 \
-  24.7
+python train.py train train_config
 ```
 
-#### Entrenar una serie de batches que estan en una carpeta
-
-- `batches_path`: directorio de archivos (`.json`) de entrenamiento.
-- `iter_n`: número de iteraciones por batch.
+El archivo de configuración `train_config.json` se debe generar a partir de `example_train_config.json`. Los parámetros disponibles para modificar son:
+- `path_data_training`: directorio de la data para entrenar el modelo 
+- `path_data_validation`: directorio de la data para entrenar el modelo
+- `is_raw`: valor booleano que determina si el archivo será convertido (cuando is_raw sea True)
+- `train_subset`:  si el valor es diferente de cero, se usará un subset del dataset (número entero)
 - `model_path`: directorio del modelo custom a utilizar
-- `training_entities`: lista de entidades a entrenar
-- `output_path`: directorio donde se almacenará el modelo más óptimo
-- `max_losses`: (número flotante) Máximo valor de Losses soportado
+- `save_model_path`: directorio donde se guardará el modelo generado a partir del entrenamiento
+- `entities`: entidadas a ser usadas para el entrenamiento.
+- `threshold`: valor a partir del cual se guardará un modelo, sólo si el score obtenido es mayor al threshold (número entero)
+- `epochs`: cantidad de iteraciones / épocas en las que se entrenará el modelo (número entero)
+- `optimizer`: aquí se pueden configurar los parámetros learning rate (tasa de aprendizaje) y beta1 del Adam Solver.
+- `dropout`: porcentaje de data de entrenamiento que se descartará aleatoriamente para dar mayor variabilidad (número decimal)
+- `batch_size`: tamaño del batch a utilizar para entrenar el modelo (número entero)
+- `callbacks`: representa un objeto de arrays de callbacks a ser usados en el entrenamiento. Para ver dichas funciones ir al archivo `callbacks.py`.
 
-```bash
-python train.py train_all_files_in_folder \
-  <batches_path> \
-  <iter_n> \
-  <model_path> \
-  <training_entities> \
-  <output_path> \
-  <max_losses>
-```
-
-**Ejemplo:**
-
-```bash
-python train.py train_all_files_in_folder \
-  data/training/batches-2020-11-24/ \
-  2 \
-  models/base/2020-12-01 \
-  "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO" \
-  models/best/2020-12-01 \
-  10.0
-```
 
 #### Utilizar Displacy para probar entidades en un modelo
 
@@ -174,22 +143,12 @@ python train.py scorer_model \
   [(41,51,"NUM_DNI")]
 ```
 
-#### Guardar en un archivo los logs del proceso
-
-```bash
-python train.py train_all_files_in_folder \
-  data/training/batches-2020-11-24/ \
-  2 \
-  models/base/2020-12-01 \
-  "FECHA,PER,DIRECCIÓN,NUM_DNI,NUM_CUIT_CUIL,EDAD,NACIONALIDAD" > logs_file_name.txt
-```
-
 #### Conversion de datasets
 
 El siguiente comando transforma una serie de documentos `.json` en formato dataturks a un dataset único, también en formato `.json`, soportado por la CLI de Spacy.
 
 ```bash
-python train.py convert_dataturks_to_training_cli \
+python train.py convert_dataturks_to_train_file \
   <input_files_path> \
   <entities> \
   <output_file_path>
@@ -198,7 +157,7 @@ python train.py convert_dataturks_to_training_cli \
 **Ejemplo:**
 
 ```bash
-python train.py convert_dataturks_to_training_cli \
+python train.py convert_dataturks_to_train_file \
   "data/raw/training" \
   "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, ARTÍCULO, PATENTE_DOMINIO" \
   "data/spacy/training/training_data.json"
@@ -211,11 +170,11 @@ Poder correr un comando en consola y se guarda en el logger el horario de comien
 - `command_to_run`: Es el comando a ejecutar con parametros y espacios incluido.Va entre comillas dobles
 
 ```bash
-python train.py run_command_with_timer "command_to_run"
+python utils.py run_command_with_timer "command_to_run"
 ```
 
 ```bash
- python train.py run_command_with_timer "python -m spacy train \
+ python utils.py run_command_with_timer "python -m spacy train \
    es \
    modelos/09-12-2020-03 \
    DatasetIntegrados/entrenamiento_circuito3.json \
