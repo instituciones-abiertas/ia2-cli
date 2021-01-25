@@ -84,10 +84,12 @@ def is_address(ent):
     ]
     first_token = ent[0]
     last_token = ent[-1]
+
     return ent.label_ in ["PER"] and (
         first_token.nbor(-1).lower_ in first_left_nbors
         or first_token.nbor(-2).lower_ in second_left_nbors
         or last_token.like_num
+        or last_token.nbor().like_num
     )
 
 
@@ -129,7 +131,8 @@ class EntityCustom(object):
             if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="FISCAL"))
             if not is_from_first_tokens(ent.start) and is_address(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="DIRECCIÓN"))
+                token_adicional = 1 if ent[-1].nbor().like_num else 0
+                new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
 
         if new_ents:
             filtered_ents = filter_spans(doc.ents, new_ents)
