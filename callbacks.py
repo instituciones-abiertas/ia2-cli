@@ -18,7 +18,7 @@ def example(param="value"):
 # The real callbacks
 
 # iteration
-def print_scores_on_epoch():
+def print_scores_on_epoch(validation=True):
   """
   write the scores/loss in the log file
   """
@@ -27,34 +27,46 @@ def print_scores_on_epoch():
     ner = state["history"]["ner"][-1]
     f_score = state["history"]["f_score"][-1]
     precision_score = state["history"]["precision"][-1]
-    val_f_score = state["history"]["val_f_score"][-1]
-    val_precision_score = state["history"]["val_precision"][-1]
-    batches = state["history"]["batches"][-1]
-
+    batches = state["history"]["batches"][-1]    
+    
     logger.info("......................................................................")
     logger.info(f" Epoch N° {e}/{state['epochs']} | batches processed: {batches}")
     logger.info(f"Scores : NER loss:{ner}, f1-score: {f_score}, precision: {precision_score}")
-    logger.info(f"Validation Losses rate: f1-score: {val_f_score}, precision: {val_precision_score}")
+    
+    # discard validation data
+    if validation:
+      val_f_score = state["history"]["val_f_score"][-1]
+      val_precision_score = state["history"]["val_precision"][-1]  
+      logger.info(f"Validation Losses rate: f1-score: {val_f_score}, precision: {val_precision_score}")
 
     return state
 
   return print_scores_cb
 
 
-def save_best_model(path_best_model="", threshold=40, score="val_f_score"):
+def save_best_model(path_best_model="", threshold=40, score="val_f_score", mode="max", test=False):
   """
   Save the model if the epoch score is more than the threshold
   or if current score is a new max.
-  #TODO include NER in the possible values
 
   :param path_best_model where to save the model
   :param threshold value to reach in order to save the first time
   :param score value to be considered
   """
   def save_best_model_cb(state, logger, model, optimizer):
+    save = False
     
-    if (state["history"][score][-1] >= threshold)  and  (state["history"][score][-1] > state["max_"+score]):
+    if mode == "max":
+      save = (state["history"][score][-1] >= threshold)  and  (state["history"][score][-1] > state["max_"+score])
+    elif mode == "min":
+      save = (state["history"][score][-1] <= threshold)  and  (state["history"][score][-1] < state["min_"+score])
+
+    if save:
         e = state["i"]+1
+        if test:
+          # change this flag to 
+            state["evaluate_test"] = True
+            
         with model.use_params(optimizer.averages):
             model.to_disk(path_best_model)
             logger.info(f"💾 Saving model for epoch {e}")
@@ -63,6 +75,33 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score"):
 
   return save_best_model_cb
 
+def test_and_save(path_best_model="", threshold=15000, score="ner", mode="min"):
+  """
+  Triggers an evaluation, and if the evaluation pass the score then saves the model
+  
+  :param path_best_model where to save the model
+  :param threshold value to reach in order to save the first time
+  :param score value to be considered
+  """
+  def test_and_save_cb(state, logger, model, optimizer):
+    save = False
+    
+    if mode == "max":
+      save = (state["history"][score][-1] >= threshold)  and  (state["history"][score][-1] > state["max_"+score])
+    elif mode == "min":
+      save = (state["history"][score][-1] <= threshold)  and  (state["history"][score][-1] < state["min_"+score])
+
+    if save:
+        e = state["i"]+1
+        with model.use_params(optimizer.averages):
+            model.to_disk(path_best_model)
+            logger.info(f"💾 Saving model for epoch {e}")
+            # change this flag to 
+            state["evaluate_test"] = True
+
+    return state
+
+  return test_and_save_cb
 
 def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last_chance=True):
   """
@@ -121,7 +160,7 @@ def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
   return early_stop_cb
 
 
-def update_best_scores():
+def update_best_scores(validation=True):
   """
   Update max or min scores in state based on history
   """
@@ -131,9 +170,11 @@ def update_best_scores():
     state["max_f_score"] = max(state["history"]["f_score"])
     state["max_recall"] = max(state["history"]["recall"])
     state["max_precision"] = max(state["history"]["precision"])
-    state["max_val_f_score"] = max(state["history"]["val_f_score"])
-    state["max_val_recall"] = max(state["history"]["val_recall"])
-    state["max_val_precision"] = max(state["history"]["val_precision"])
+
+    if validation:
+      state["max_val_f_score"] = max(state["history"]["val_f_score"])
+      state["max_val_recall"] = max(state["history"]["val_recall"])
+      state["max_val_precision"] = max(state["history"]["val_precision"])
     return state
 
   return update_best_scores_cb
@@ -181,7 +222,7 @@ def change_dropout_fixed(step=0.01, until=0.5):
 
 # on stop plugins
 
-def log_best_scores():
+def log_best_scores(validation=True):
   """
   Logs the max/mins from state
   """
@@ -192,16 +233,21 @@ def log_best_scores():
     logger.info(f"using a dataset of length {state['train_size']} in {e}/{state['epochs']}")
     logger.info(f"elapsed time: {state['elapsed_time']} minutes")
     logger.info(f"NER loss -> min {state['min_ner']}")
-    logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
-    logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
-    logger.info(f"F-SCORE -> max {state['max_f_score']} | val max {state['max_val_f_score']}")
-
+    # Scores
+    if validation:
+      logger.info(f"RECALL -> max {state['max_recall']} | validation max {state['max_val_recall']}")
+      logger.info(f"PRECISION -> max {state['max_precision']} | val max {state['max_val_precision']}")
+      logger.info(f"F-SCORE -> max {state['max_f_score']} | val max {state['max_val_f_score']}")
+    else:
+      logger.info(f"RECALL -> max {state['max_recall']}")
+      logger.info(f"PRECISION -> max {state['max_precision']}")
+      logger.info(f"F-SCORE -> max {state['max_f_score']}")
     return state
 
   return log_best_scores_cb
 
 
-def save_csv_history(filename="history.csv", session=""):
+def save_csv_history(filename="history.csv", session="", validation=True):
   """
   Save history values to csv file
   :param filename file where to write the csv rows
@@ -229,6 +275,15 @@ def save_csv_history(filename="history.csv", session=""):
     #prepare the rows
     logger.info(f"\n[save_csv_history] preparing rows ...")
     for i in range(len(state["history"]["ner"])):
+
+      if validation:
+        val_f_score = state["history"]["val_f_score"][i]
+        val_recall = state["history"]["val_recall"][i]
+        val_precision = state["history"]["val_precision"][i]
+        val_per_type_score = state["history"]["val_per_type_score"][i]
+      else:
+        val_f_score, val_recall, val_precision, val_per_type_score = None, None, None, None
+
       rows.append({
         "session": s,
         "epoch": i+1,
@@ -240,10 +295,10 @@ def save_csv_history(filename="history.csv", session=""):
         "recall": state["history"]["recall"][i],
         "precision": state["history"]["precision"][i],
         "per_type_score": state["history"]["per_type_score"][i],
-        "val_f_score": state["history"]["val_f_score"][i],
-        "val_recall": state["history"]["val_recall"][i],
-        "val_precision": state["history"]["val_precision"][i],
-        "val_per_type_score": state["history"]["val_per_type_score"][i],
+        "val_f_score": val_f_score,
+        "val_recall": val_recall,
+        "val_precision": val_precision,
+        "val_per_type_score": val_per_type_score,
       })
 
     # opening the csv file in 'w' mode

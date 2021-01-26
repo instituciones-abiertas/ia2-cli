@@ -36,6 +36,9 @@ from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns
 from pipeline_components.entity_custom import EntityCustom
 import shutil
 
+# if GPU enabled
+import cupy
+from thinc.neural.optimizers import Adam
 
 logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
@@ -45,6 +48,7 @@ formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(me
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
+spacy.prefer_gpu()
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -444,7 +448,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         state["history"]["dropout"].append(dropout)
 
     def get_best_model(
-        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}
+        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}
     ):
         init_time = time.time()
         print("\nsettings", settings)
@@ -479,22 +483,28 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             "dropout": settings["dropout"],
             "elapsed_time": 0,
             "stop": False,
+            "evaluate_test": False
         }
 
 
-        optimizer.L2 = 0.0
+        optimizer.L2 = 0.001
         # callback
         # callbacks["on_iteration"].append(update_best_scores())
 
-        # for validation
-        val_texts, val_annotations = zip(*validation_data)
+        # for validation. activate if exists validation data
+        if False:
+            val_texts, val_annotations = zip(*validation_data)
+        
+        if len(testing_data) > 0:
+            test_texts, test_annotations = zip(*testing_data)    
+
         tr_texts, tr_annotations = zip(*training_data)
 
         while not state["stop"] and state["i"] < state["epochs"]:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
-
+                    
             # set/update Adam optimizer from state
             optimizer.learn_rate = state["lr"]
             optimizer.beta1 = state["beta1"]
@@ -507,12 +517,12 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             # Creates mini batches
             batches = minibatch(training_data, size=batch_size)
             num_batches = 0
-            bz = []
+            #bz = []
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
 
-                bz.append(len(texts))
+                #bz.append(len(texts))
                 nlp.update(
                     texts,  # batch of raw texts
                     annotations,  # batch of annotations
@@ -526,16 +536,19 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                     state = cb(state, logger, nlp, optimizer)
 
             try:
-                print(bz)
+                
                 # compute validation scores
-                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, val_texts, val_annotations
-                )
-
+                val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
+                if settings["evaluate"] == "val":
+                    val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
+                        optimizer, nlp, val_texts, val_annotations
+                    )
+                
                 # train data score
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
                     optimizer, nlp, tr_texts, tr_annotations
                 )
+
                 numero_losses = losses.get("ner")
 
             except Exception:
@@ -562,6 +575,20 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             for cb in callbacks["on_iteration"]:
                 state = cb(state, logger, nlp, optimizer)
 
+            # compute testing dataset scores
+            # Since we can save many models if some threshold has been reached
+            # dusring the train loop. We also want to get scores on test data
+            # for each one of this models.         
+            if settings["evaluate"] == "test" and state["evaluate_test"]:
+                test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
+                    optimizer, nlp, test_texts, test_annotations
+                )
+                logger.info("############################################################")
+                logger.info(f"Evaluating saved model with test data")
+                logger.info(f"Scores :f1-score: {test_f_score}, precision: {test_precision_score}")
+                logger.info("############################################################")
+                
+            state["evaluate_test"] = False
             state["i"] += 1
 
         # Run callbacks after train loop
@@ -569,7 +596,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         for cb in callbacks["on_stop"]:
             state = cb(state, logger, nlp, optimizer)
 
-    def set_lr_and_beta1(self, train_config):
+    def set_optimizer(self, train_config):
         # Adam settings and defaults
         if not "optimizer" in train_config:
             lr = 0.004
@@ -632,9 +659,13 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 train_config = train_config[config]
 
             # train settings
-            lr, beta1 = self.set_lr_and_beta1(train_config)
+            lr, beta1 = self.set_optimizer(train_config)
             dropout = self.set_dropout(train_config, FUNC_MAP)
             batch_size, batch_args = self.set_batch_size(train_config, FUNC_MAP)
+
+            evaluate = "val"
+            if "evaluate" in train_config and train_config["evaluate"] == "test":
+                evaluate = "test"
 
             s = {
                 "lr": lr,
@@ -643,6 +674,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 # "dropout_args": dropout_args,
                 "batch_size": batch_size,
                 "batch_args": batch_args,
+                "evaluate": evaluate
             }
 
             on_iter_cb = []
@@ -673,7 +705,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             train_config["threshold"],
             train_config["is_raw"],
             train_config["path_data_validation"],
-            train_config["path_data_testing"],
+            path_data_testing=train_config["path_data_testing"],
             callbacks=c,
             settings=s,
             train_subset=train_config["train_subset"],
@@ -739,6 +771,11 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 with open(path_data_testing) as f:
                     testing_data = json.load(f)        
 
+
+        # mix train and validation data
+        training_data += validation_data
+        print("total data: ", len(training_data))    
+
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
@@ -759,7 +796,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
-            optimizer = nlp.begin_training()
+            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 512}})
 
             # we save the first model and then we update it if there is a better version of it
             logger.info(f"💾 Saving initial model")
@@ -794,6 +831,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 training_data,
                 path_best_model,
                 validation_data=validation_data,
+                testing_data=testing_data,
                 callbacks=callbacks,
                 settings=settings,
             )
@@ -1005,6 +1043,14 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         logger.info(f"End {end} to process ")
         logger.info(f"Spend {end-begin_time} to process ")
 
+
+    #
+    # GPU compatibility. Check CUDA versions before instal spacy[cudaxxx]
+    #
+
+    def test_gpu(self):
+        gpu = spacy.require_gpu()
+        print(gpu)
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
