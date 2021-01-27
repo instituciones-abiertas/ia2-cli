@@ -487,7 +487,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         }
 
 
-        optimizer.L2 = 0.001
+        optimizer.L2 = 0.005
         # callback
         # callbacks["on_iteration"].append(update_best_scores())
 
@@ -586,6 +586,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 logger.info("############################################################")
                 logger.info(f"Evaluating saved model with test data")
                 logger.info(f"Scores :f1-score: {test_f_score}, precision: {test_precision_score}")
+                logger.info(f"{test_per_type_score}")
                 logger.info("############################################################")
                 
             state["evaluate_test"] = False
@@ -796,7 +797,10 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
-            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 512}})
+
+            # these configs are not yet well documented in SpaCy 2
+            # please read this https://github.com/explosion/spaCy/issues/5513#issuecomment-635169316
+            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 4, "hidden_width": 32, "bilstm_depth": 2}})
 
             # we save the first model and then we update it if there is a better version of it
             logger.info(f"💾 Saving initial model")
