@@ -452,7 +452,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
     ):
         init_time = time.time()
         print("\nsettings", settings)
-
+        optimizer = self.set_optimizer(optimizer, **settings["optimizer"])
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -478,16 +478,13 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": settings["lr"],
-            "beta1": settings["beta1"],
+            "lr": optimizer.learn_rate,
             "dropout": settings["dropout"],
             "elapsed_time": 0,
             "stop": False,
             "evaluate_test": False
         }
 
-
-        optimizer.L2 = 0.005
         # callback
         # callbacks["on_iteration"].append(update_best_scores())
 
@@ -507,7 +504,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                     
             # set/update Adam optimizer from state
             optimizer.learn_rate = state["lr"]
-            optimizer.beta1 = state["beta1"]
 
             if len(settings["batch_args"]) > 0:
                 batch_size = settings["batch_size"](*settings["batch_args"])
@@ -597,22 +593,20 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         for cb in callbacks["on_stop"]:
             state = cb(state, logger, nlp, optimizer)
 
-    def set_optimizer(self, train_config):
-        # Adam settings and defaults
-        if not "optimizer" in train_config:
-            lr = 0.004
-            beta1 = 0.9
-        else:
-            if "lr" in train_config["optimizer"]:
-                lr = train_config["optimizer"]["lr"]
-            else:
-                lr = 0.004
-
-            if "beta1" in train_config["optimizer"]:
-                beta1 = train_config["optimizer"]["beta1"]
-            else:
-                beta1 = 0.9
-        return lr, beta1
+    def set_optimizer(self, optimizer, learn_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8, L2=1e-3, max_grad_norm=1.0):
+        """
+        Function to customizer spaCy default Adam optimizer
+        # read this before touch here https://enrico-alemani.medium.com/the-customized-spacy-training-loop-9e3756fbb6f6
+        """
+        
+        optimizer.learn_rate = learn_rate
+        optimizer.beta1 = beta1
+        optimizer.beta2 = beta2
+        optimizer.eps = eps
+        optimizer.L2 = L2
+        optimizer.max_grad_norm = max_grad_norm
+    
+        return optimizer
 
     def set_dropout(self, train_config, FUNC_MAP):
         # TODO NOT working with decaying
@@ -660,7 +654,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 train_config = train_config[config]
 
             # train settings
-            lr, beta1 = self.set_optimizer(train_config)
             dropout = self.set_dropout(train_config, FUNC_MAP)
             batch_size, batch_args = self.set_batch_size(train_config, FUNC_MAP)
 
@@ -668,10 +661,14 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             if "evaluate" in train_config and train_config["evaluate"] == "test":
                 evaluate = "test"
 
+            # optimizer hyperparams
+            optimizer = {}
+            if "optimizer" in train_config:
+                optimizer = train_config["optimizer"]
+                        
             s = {
-                "lr": lr,
-                "beta1": beta1,
                 "dropout": dropout,
+                "optimizer": optimizer,
                 # "dropout_args": dropout_args,
                 "batch_size": batch_size,
                 "batch_args": batch_args,
@@ -798,9 +795,9 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
 
-            # these configs are not yet well documented in SpaCy 2
+            # NOTE these configs are not yet well documented in SpaCy 2
             # please read this https://github.com/explosion/spaCy/issues/5513#issuecomment-635169316
-            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 4, "hidden_width": 32, "bilstm_depth": 2}})
+            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 64}})
 
             # we save the first model and then we update it if there is a better version of it
             logger.info(f"💾 Saving initial model")
