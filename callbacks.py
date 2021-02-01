@@ -28,7 +28,6 @@ def print_scores_on_epoch(validation=True):
     f_score = state["history"]["f_score"][-1]
     precision_score = state["history"]["precision"][-1]
     batches = state["history"]["batches"][-1]    
-    
     logger.info("......................................................................")
     logger.info(f" Epoch N° {e}/{state['epochs']} | batches processed: {batches}")
     logger.info(f"Scores : NER loss:{ner}, f1-score: {f_score}, precision: {precision_score}")

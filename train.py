@@ -8,14 +8,12 @@ import datetime
 import os
 import re
 import sys
-import subprocess
 import spacy
 import time
-from spacy.util import minibatch, compounding, filter_spans, decaying
-from spacy.gold import biluo_tags_from_offsets
+import utils
+from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
-from spacy.gold import GoldParse, docs_to_json
-from spacy.pipeline import EntityRuler
+from spacy.gold import GoldParse
 from spacy.cli import package
 import srsly
 from os import listdir
@@ -31,14 +29,11 @@ from callbacks import (
     save_csv_history,
     change_dropout_fixed,
 )
-from pipeline_components.entity_ruler import ruler_patterns
-from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns
-from pipeline_components.entity_custom import EntityCustom
-import shutil
 
 # if GPU enabled
 import cupy
 from thinc.neural.optimizers import Adam
+spacy.prefer_gpu()
 
 logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
@@ -47,8 +42,6 @@ logger_fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s")
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
-
-spacy.prefer_gpu()
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -103,7 +96,6 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
         logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
 
-
 class SpacyUtils:
     """
     SpacyUtils: Dataturks format converter and other Spacy model utilities.
@@ -123,7 +115,7 @@ class SpacyUtils:
     """
 
     # =================================
-    # Create Models functions
+    # Creation Models functions
     # =================================
 
     def create_blank_model(self, output_path: str):
@@ -176,106 +168,9 @@ class SpacyUtils:
 
         logger.info(f'Succesfully added entities at model: "{model_path}".')
 
-    def build_model_package(
-        self, model_path: str, package_path: str, model_name: str, model_version: str, model_components: str
-    ):
-        """
-        Add rules updating the model to the given path and package model
-
-        :param model_path: A model path
-        :param package_path: A package path
-        :param model_name: A new model name
-        :param model_version: A new model version
-        :param model_components: A model components path
-        """
-        nlp = spacy.load(model_path)
-
-        nlp.meta["name"] = model_name
-        nlp.meta["version"] = str(model_version)
-
-        ruler = EntityRuler(nlp, overwrite_ents=True)
-        ruler.add_patterns(ruler_patterns)
-        nlp.add_pipe(ruler)
-
-        entity_matcher = EntityMatcher(nlp, matcher_patterns)
-        nlp.add_pipe(entity_matcher)
-
-        entity_custom = EntityCustom(nlp)
-        nlp.add_pipe(entity_custom)
-
-        nlp.to_disk(model_path)
-        logger.info(f'Succesfully added rule based mathching at model: "{model_path}".')
-
-        package(model_path, package_path)
-        logger.info(f'Succesfully package at model: "{package_path}".')
-
-        package_name = nlp.meta["lang"] + "_" + nlp.meta["name"]
-        package_dir = package_name + "-" + nlp.meta["version"]
-        package_base_path = os.path.join(package_path, package_dir, package_name)
-
-        # Copio archivos con modulos custom al directorio pipe_components (no uso model_components para que sea fijo y siempre el mismo en nuestro componente, y asi poder desacoplarlo de cuando tengamos multiples clientes
-        package_components_dir = "pipeline_components"
-        files_src = ["entity_matcher.py", "entity_custom.py"]
-        dest_component_dir = os.path.join(package_base_path, package_dir, package_components_dir)
-        os.mkdir(dest_component_dir)
-        for f in files_src:
-            dest = os.path.join(dest_component_dir, f)
-            orig = os.path.join(model_components, f)
-            shutil.copyfile(orig, dest)
-
-        new_code = f"""
-import os
-import importlib
-from spacy.language import Language
-def import_path(path):
-    module_name = os.path.basename(path).replace('-', '_').replace('.','-')
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-dir =  os.fspath(Path(__file__).parent)
-moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
-moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
-
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
-Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
-        """
-
-        insert_line = 6
-        package_filename = "__init__.py"
-        init_py = os.path.join(package_base_path, package_filename)
-        with open(init_py, "r") as f:
-            content = f.readlines()
-        with open(init_py, "w") as f:
-            for c in new_code.splitlines()[::-1]:
-                content.insert(insert_line, c + "\n")
-            f.writelines(content)
-        logger.info("Succesfully write language factories to model")
-
     # =================================
     # Data Conversion functions
     # =================================
-
-    def convert_dataturks_to_spacy(self, input_file_path: str, output_file_path: str, entities: list):
-        """
-        Given a dataturks format .json file, an output path and a list of
-        entities, converts the input data into Spacy recognisable format to
-        pickle dump it at the given output path.
-
-        :param input_file_path: A string representing the path to a dataturks
-        .json format input file.
-        :param output_file_path: A string representing the output path.
-        :param entities: A list of string representing entities to recognise
-        during data conversion.
-        """
-        logger.info(f'Starts converting data from "{input_file_path}"...')
-        training_data = []
-        with open(output_file_path, "a+"):
-            training_data.append(convert_dataturks_to_spacy(input_file_path, entities))
-        with open(output_file_path, "wb") as output:
-            pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
-        logger.info(f'Succesfully converted data at "{output_file_path}".')
 
     def convert_dataturks_to_train_file(
         self, input_files_path: str, entities: list, output_file_path: str, num_files: int = 0
@@ -283,7 +178,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         """
         Given an input directory and a list of entities, converts every .json
         file from the directory into a single .json to be used with train_model
-        method. Unlike convert_dataturks_to_training_cli this does not convert
+        method. Unlike utils.py - convert_dataturks_to_training_cli this does not convert
         documents to Spacy JSON format used in Spacy cli train command.
         Writes it out to the given output directory.
 
@@ -321,138 +216,17 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         except Exception:
             logging.exception(f'An error occured writing the output file at "{output_file_path}".')
 
-    def convert_dataturks_to_training_cli(self, input_files_path: str, entities: list, output_file_path: str):
-        """
-        Given an input directory and a list of entities, converts every .json
-        file from the directory into a single .json recognisable by Spacy and
-        writes it out to the given output directory.
-
-        :param input_files_path: Directory pointing to dataturks .json files to
-        be converted.
-        :param entities: A list of entities, separated by comma, to be
-        considered during annotations extraction from each dadaturks batch.
-        :param output_file_path: The path and name of the output file.
-        """
-        nlp = spacy.load("es_core_news_lg", disable=["ner"])
-
-        TRAIN_DATA = []
-        begin_time = datetime.datetime.now()
-        input_files = [f for f in listdir(input_files_path) if isfile(join(input_files_path, f))]
-
-        for input_file in input_files:
-            logger.info(f'Extracting raw data and occurrences from file: "{input_file}"...')
-            extracted_data = convert_dataturks_to_spacy(f"{input_files_path}/{input_file}", entities)
-            TRAIN_DATA = TRAIN_DATA + extracted_data
-            logger.info(f'Finished extracting data from file "{input_file}".')
-
-        diff = datetime.datetime.now() - begin_time
-        logger.info(f"Lasted {diff} to extract dataturks data from {len(input_files)} documents.")
-        logger.info(
-            f"Converting {len(TRAIN_DATA)} Documents with Occurences extracted from {len(input_files)} files into Spacy supported format..."
-        )
-
-        docs = []
-        for text, annot in TRAIN_DATA:
-            doc = nlp(text)
-
-            new_ents = []
-            for start_idx, end_idx, label in annot["entities"]:
-                span = doc.char_span(start_idx, end_idx, label=label)
-
-                if span is None:
-                    conflicted_entity = {
-                        "file_dir": input_files_path,
-                        "label": label,
-                        "start_index": start_idx,
-                        "end_index": end_idx,
-                        "matches_text": text[start_idx:end_idx],
-                    }
-                    logger.critical(
-                        f'Conflicted entity: could not save an entity because it does not match an entity in the given document. Output: "{conflicted_entity}".'
-                    )
-                else:
-                    new_ents.append(span)
-
-            doc.ents = new_ents
-            docs.append(doc)
-
-        diff = datetime.datetime.now() - begin_time
-        logger.info(f"Finished Converting {len(TRAIN_DATA)} Spacy Documents into trainable data. Lasted: {diff}")
-
-        try:
-            logger.info(f'💾 Writing final output at "{output_file_path}"...')
-            srsly.write_json(output_file_path, [docs_to_json(docs)])
-            logger.info("💾 Done.")
-        except Exception:
-            logging.exception(f'An error occured writing the output file at "{output_file_path}".')
 
     # =================================
     # Model Training functions
     # =================================
-
-    # FIXME no se está usando esta función
-    # def train_batches(self, optimizer, nlp, batches, losses, best, path_best_model):
-    # for batch in batches:
-    # texts, annotations = zip(*batch)
-
-    # nlp.update(
-    # texts, # batch of raw texts
-    # annotations, # batch of annotations
-    # drop=DROPOUT_RATE,
-    # losses=losses,
-    # sgd=optimizer,
-    # )
-    # logger.info(f"⬇️ Losses rate: [{losses}]")
-    # try:
-    # numero_losses = losses.get("ner")
-    # if numero_losses < best and numero_losses > 0:
-    # best = numero_losses
-    # nlp.to_disk(path_best_model)
-    # logger.info(f"💾 Saving model with losses: [{best}]")
-
-    # except Exception:
-    # logger.exception("The batch has no training data.")
-
-    # return best
-
-    def save_state_history(
-        self,
-        state,
-        numero_losses,
-        f_score,
-        recall_score,
-        precision_score,
-        per_type_score,
-        val_f_score,
-        val_recall_score,
-        val_precision_score,
-        val_per_type_score,
-        learn_rate,
-        num_batches,
-        dropout,
-    ):
-        state["history"]["ner"].append(numero_losses)
-        state["history"]["f_score"].append(f_score)
-        state["history"]["recall"].append(recall_score)
-        state["history"]["precision"].append(precision_score)
-        state["history"]["per_type_score"].append(per_type_score)
-
-        # validation
-        state["history"]["val_f_score"].append(val_f_score)
-        state["history"]["val_recall"].append(val_recall_score)
-        state["history"]["val_precision"].append(val_precision_score)
-        state["history"]["val_per_type_score"].append(val_per_type_score)
-
-        state["history"]["lr"].append(learn_rate)
-        state["history"]["batches"].append(num_batches)
-        state["history"]["dropout"].append(dropout)
 
     def get_best_model(
         self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}
     ):
         init_time = time.time()
         print("\nsettings", settings)
-        optimizer = self.set_optimizer(optimizer, **settings["optimizer"])
+        optimizer = utils.set_optimizer(optimizer, **settings["optimizer"])
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -550,7 +324,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             except Exception:
                 logger.exception("The batch has no training data.")
 
-            self.save_state_history(
+            utils.save_state_history(
                 state,
                 numero_losses,
                 f_score,
@@ -593,42 +367,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         for cb in callbacks["on_stop"]:
             state = cb(state, logger, nlp, optimizer)
 
-    def set_optimizer(self, optimizer, learn_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8, L2=1e-3, max_grad_norm=1.0):
-        """
-        Function to customizer spaCy default Adam optimizer
-        # read this before touch here https://enrico-alemani.medium.com/the-customized-spacy-training-loop-9e3756fbb6f6
-        """
-        
-        optimizer.learn_rate = learn_rate
-        optimizer.beta1 = beta1
-        optimizer.beta2 = beta2
-        optimizer.eps = eps
-        optimizer.L2 = L2
-        optimizer.max_grad_norm = max_grad_norm
-    
-        return optimizer
-
-    def set_dropout(self, train_config, FUNC_MAP):
-        # TODO NOT working with decaying
-        if not "dropout" in train_config:
-            return 0.2
-        else:
-            if type(train_config["dropout"]) == int or type(train_config["dropout"]) == float:
-                return train_config["dropout"]
-            else:
-                d = train_config["dropout"]
-                return FUNC_MAP[d.pop("f")](d["from"], d["to"], d["rate"])
-
-    def set_batch_size(self, train_config, FUNC_MAP):
-        if not "batch_size" in train_config:
-            return 4, ()
-        else:
-            if type(train_config["batch_size"]) == int or type(train_config["batch_size"]) == float:
-                return train_config["batch_size"], ()
-            else:
-                b = train_config["batch_size"]
-                return (FUNC_MAP[b.pop("f")], (b["from"], b["to"], b["rate"]))
-
     def train(self, config: str):
         """
         Runs the train_model method using the selected configuration from train_config.json
@@ -654,8 +392,8 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 train_config = train_config[config]
 
             # train settings
-            dropout = self.set_dropout(train_config, FUNC_MAP)
-            batch_size, batch_args = self.set_batch_size(train_config, FUNC_MAP)
+            dropout = utils.set_dropout(train_config, FUNC_MAP)
+            batch_size, batch_args = utils.set_batch_size(train_config, FUNC_MAP)
 
             evaluate = "val"
             if "evaluate" in train_config and train_config["evaluate"] == "test":
@@ -740,7 +478,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         trained model.
         :param max_losses: A float representing the maximum NER losses value
         to consider before start writing best models output.
-        :param is_raw A boolean that determines if the train file will be converteb        True by default
+        :param is_raw A boolean that determines if the train file will be converted        True by default
         """
 
         if is_raw:
@@ -837,63 +575,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 settings=settings,
             )
 
-    # FIXME NO se está usando, se refactorizó para cambiar la forma en que iteramos => n_iter, files, minibatches
-    # de la manera previa no se podía hacer un early stopping ya que al procesar otro archivo,
-    # debe iterar muchas veces hasta lograr "acercarse" al mejor score vigente
-    # def train_all_files_in_folder(
-    # self,
-    # training_files_path: str,
-    # n_iter: int,
-    # model_path: str,
-    # entities: list,
-    # best_model_path: str,
-    # max_losses: float,
-    # ):
-    # """
-    # Given the path to a dataturks .json format input file directory, a list
-    # of entities and a path to an existent Spacy model, trains that model for
-    # `n_iter` iterations with the given entities. Whenever a best model is
-    # found it is writen to disk at the given output path.
-    #
-    # :param training_files_path: A string representing the path to the input
-    # files directory.
-    # :param n_iter: An integer representing a number of iterations.
-    # :param model_path: A string representing the path to the model to train.
-    # :param entities: A list of string representing the entities to consider
-    # during training.
-    # :param best_model_path: A string representing the path to write the best
-    # trained model.
-    # :param max_losses: A float representing the maximum NER losses value
-    # to consider before start writing best models output.
-    # """
-
-    #
-    # begin_time = datetime.datetime.now()
-    # onlyfiles = [
-    # f
-    # for f in listdir(training_files_path)
-    # if isfile(join(training_files_path, f))
-    # ]
-    # random.shuffle(onlyfiles)
-    # self.add_new_entity_to_model(entities, model_path)
-    # best_losses = max_losses
-    # processed_docs = 0
-    # for file_name in onlyfiles:
-    # logger.info(f"Started processing file at \"{file_name}\"...")
-    # best_losses = self.train_model(
-    # training_files_path + file_name,
-    # n_iter,
-    # model_path,
-    # entities,
-    # best_model_path,
-    # best_losses,
-    # )
-    # processed_docs = processed_docs + 1
-    # print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-    # logger.info(f"Maximum considerable losses is \"{best_losses}\".")
-    # logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
-    # diff = datetime.datetime.now() - begin_time
-    # logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
     # =================================
     # Evaluation and display functions
@@ -963,86 +644,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             recall_score_sum / len(texts),
             ents_per_type_sum,
         )
-
-    def count_examples(self, files_path: str, entities: list):
-        """
-        Given the path to a dataturks .json format input file directory and a
-        list of entities, prints the total number of examples by label.
-
-        :param files_path: Directory pointing to dataturks .json files to
-        be converted.
-        :param entities: A list of entities, separated by comma, to be
-        considered in the final output.
-        """
-        entities = entities.split(",")
-        input_files_dir_path = files_path
-        onlyfiles = [f for f in listdir(input_files_dir_path) if isfile(join(input_files_dir_path, f))]
-        all_entities = {}
-        for entity in entities:
-            entity_length = 0
-            for file_ in onlyfiles:
-                validation_data = convert_dataturks_to_spacy(input_files_dir_path + file_, [entity])
-                for _, annotations in validation_data:
-                    occurences = annotations.get("entities")
-                    entity_length = entity_length + len(occurences)
-            all_entities[entity] = entity_length
-        logger.info(f"Total entities output: {all_entities}")
-
-    def show_text(self, files_path: str, entity: str, context_words=0):
-        """
-        Given the path to a dataturks .json format input file directory and an
-        entity name, prints the annotation text from label.
-
-        :param files_path: Directory pointing to dataturks .json files
-        :param entity: entity label name.
-        """
-        files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
-        texts = []
-
-        for file_ in files:
-            with open(file_, "r") as f:
-                lines = f.readlines()
-                for line in lines:
-                    data = json.loads(line)
-                    for a in data["annotation"] or []:
-                        output = ""
-                        if a["label"][0] == entity:
-                            if not a["points"][0]["text"] in texts:
-                                text = a["points"][0]["text"]
-                                if context_words:
-                                    text = re.escape(a["points"][0]["text"])
-                                    interval = r"{{0,{0}}}".format(context_words)
-                                    regex = (
-                                        r"((?:\S+\s+)"
-                                        + interval
-                                        + r"\b"
-                                        + text
-                                        + r"\b\s*(?:\S+\b\s*)"
-                                        + interval
-                                        + ")"
-                                    )
-                                    x = re.search(regex, data["content"])
-                                    if x:
-                                        output = x.group()
-                                else:
-                                    output = text
-                                texts.append(output)
-        for text in texts:
-            print(text)
-
-    def run_command_with_timer(self, *args):
-        """
-        Calculate the time spend to run command
-
-        :param *args: run command
-        """
-        begin_time = datetime.datetime.now()
-        logger.info("####START####")
-        logger.info(f"Start process {begin_time} ")
-        subprocess.call(args[0], shell=True)
-        end = datetime.datetime.now()
-        logger.info(f"End {end} to process ")
-        logger.info(f"Spend {end-begin_time} to process ")
 
 
     #
