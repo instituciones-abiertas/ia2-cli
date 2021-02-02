@@ -89,17 +89,20 @@ python train.py train train_config
 
 El archivo de configuración `train_config.json` se debe generar a partir de `example_train_config.json`. Los parámetros disponibles para modificar son:
 - `path_data_training`: directorio de la data para entrenar el modelo 
-- `path_data_validation`: directorio de la data para entrenar el modelo
+- `path_data_validation`: directorio de la data de validación para evaluar el modelo
+- `path_data_training`: directorio de la data de testing para evaluar el modelo
+- `merge_train_val`: valor booleano que determina si se deben mezclar los conjuntos de entrenamiento y validación. Ver [F. Chollet, _Deep Learning in Python_ , cap. 4.2](https://livebook.manning.com/book/deep-learning-with-python/chapter-4/44). El valor por defecto es `false`
+- `evaluate`: valor que determina que conjunto de datos usar para evaluar el modelo. Opciones `test` / `val`. `val` es el valor por defecto y no es necesario incluirlo
 - `is_raw`: valor booleano que determina si el archivo será convertido (cuando is_raw sea True)
-- `train_subset`:  si el valor es diferente de cero, se usará un subset del dataset (número entero)
+- `train_subset`:  si el valor es diferente de cero, se usará un subset del dataset tomado aleatoriamente (número entero)
 - `model_path`: directorio del modelo custom a utilizar
 - `save_model_path`: directorio donde se guardará el modelo generado a partir del entrenamiento
 - `entities`: entidadas a ser usadas para el entrenamiento.
 - `threshold`: valor a partir del cual se guardará un modelo, sólo si el score obtenido es mayor al threshold (número entero)
 - `epochs`: cantidad de iteraciones / épocas en las que se entrenará el modelo (número entero)
-- `optimizer`: aquí se pueden configurar los parámetros learning rate (tasa de aprendizaje) y beta1 del Adam Solver.
-- `dropout`: porcentaje de data de entrenamiento que se descartará aleatoriamente para dar mayor variabilidad (número decimal)
-- `batch_size`: tamaño del batch a utilizar para entrenar el modelo (número entero)
+- `optimizer`: aquí se pueden configurar los parámetros como el learning rate (tasa de aprendizaje) y otros presentes en el optimizador [Adam](https://thinc.ai/docs/api-optimizers#adam).
+- `dropout`: porcentaje de _weights_ que se descartarán aleatoriamente para dar mayor variabilidad (número decimal) y evitar que el modelo memorice los datos de entrenamiento.
+- `batch_size`: tamaño del batch (cantidad de textos) a utilizar para entrenar el modelo (número entero)
 - `callbacks`: representa un objeto de arrays de callbacks a ser usados en el entrenamiento. Para ver dichas funciones ir al archivo `callbacks.py`.
 
 
