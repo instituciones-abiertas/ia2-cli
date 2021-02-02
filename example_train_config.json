@@ -1,10 +1,11 @@
 {
-  "example": {
+  "example_final_model": {
+    "use_gpu": false,
     "path_data_training": "data/your_train_data.json",
     "path_data_validation": "data/your_validation_data.json",
     "path_data_testing": "data/unified/testing.json",
     "is_raw": false,
-    "merge_train_val": false,
+    "merge_train_val": true,
     "train_subset": 0,
     "model_path": "models/your_base_model/",
     "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
@@ -29,7 +30,8 @@
     }
   },
 
-  "another_config": {
+  "example_finding_hyperparams": {
+    "use_gpu": false,
     "path_data_training": "data/your_train_data.json",
     "path_data_validation": "data/your_validation_data.json",
     "is_raw": false,
@@ -49,7 +51,10 @@
         {"f": "sleep", "secs": 1, "log": true} 
       ],
       "on_batch":[],
-      "on_stop":[]
+      "on_stop":[
+        {"f": "log_best_scores"},
+        {"f": "save_csv_history"}
+      ]
     }
   }
 }

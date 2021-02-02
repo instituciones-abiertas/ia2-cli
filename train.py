@@ -30,11 +30,6 @@ from callbacks import (
     change_dropout_fixed,
 )
 
-# if GPU enabled
-import cupy
-from thinc.neural.optimizers import Adam
-spacy.prefer_gpu()
-
 logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
 logger_fh = logging.FileHandler("logs/debug.log")
@@ -390,6 +385,16 @@ class SpacyUtils:
             with open("train_config.json") as f:
                 train_config = json.load(f)
                 train_config = train_config[config]
+            # GPU
+            # if GPU enabled
+
+            if "use_gpu" in train_config and train_config["use_gpu"] == True:
+                try:
+                    import cupy
+                    spacy.prefer_gpu()
+                    logger.info("Using GPU 🎮")
+                except:
+                    logger.warning("❗ Either GPU not available or CUDA versions is not compatible")    
 
             # train settings
             dropout = utils.set_dropout(train_config, FUNC_MAP)
