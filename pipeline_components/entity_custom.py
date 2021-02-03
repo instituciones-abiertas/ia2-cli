@@ -36,28 +36,57 @@ def is_from_first_tokens(token_id):
 
 def is_judge(ent):
     first_token = ent[0]
+    judge_lemma = ["juez", "jueza", "Juez", "Jueza"]
     return ent.label_ in ["PER", "LOC"] and (
-        first_token.nbor(-1).lemma_ in ["juez", "Juez"]
-        or first_token.nbor(-2).lemma_ in ["juez", "Juez"]
-        or first_token.nbor(-2).lemma_ in ["juez", "Juez"]
+        first_token.nbor(-1).lemma_ in judge_lemma
+        or first_token.nbor(-2).lemma_ in judge_lemma
+        or first_token.nbor(-3).lemma_ in judge_lemma
     )
-
 
 def is_secretary(ent):
     first_token = ent[0]
+    secretarix_lemma = ["secretario", "secretaria", "prosecretario", "prosecretaria", "Prosecretario", "Prosecretaria", "Secretario", "Secretaria"]
     return ent.label_ in ["PER", "LOC"] and (
-        first_token.nbor(-1).lemma_ in ["secretario", "Secretario"]
-        or first_token.nbor(-2).lemma_ in ["secretario", "Secretario"]
-        or first_token.nbor(-2).lemma_ in ["secretario", "Secretario"]
+        first_token.nbor(-1).lemma_ in secretarix_lemma 
+        or first_token.nbor(-2).lemma_ in secretarix_lemma 
+        or first_token.nbor(-3).lemma_ in secretarix_lemma
     )
 
 
 def is_prosecutor(ent):
     first_token = ent[0]
+    prosecutor_lemma = ["fiscal", "fiscalía", "Fiscal", "Fiscalía"]
     return ent.label_ in ["PER", "LOC"] and (
-        first_token.nbor(-1).lemma_ in ["fiscal", "Fiscal, Fiscalía, fiscalía"]
-        or first_token.nbor(-2).lemma_ in ["fiscal", "Fiscal, Fiscalía, fiscalía"]
-        or first_token.nbor(-2).lemma_ in ["fiscal", "Fiscal, Fiscalía, fiscalía"]
+        first_token.nbor(-1).lemma_ in prosecutor_lemma
+        or first_token.nbor(-2).lemma_ in prosecutor_lemma
+        or first_token.nbor(-3).lemma_ in prosecutor_lemma
+    )
+
+def is_ombuds_person(ent):
+    first_token = ent[0]
+    ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
+    return ent.label_ in ["PER", "LOC"] and (
+        first_token.nbor(-1).lemma_ in ombuds_person_lemma
+        or first_token.nbor(-2).lemma_ in ombuds_person_lemma
+        or first_token.nbor(-3).lemma_ in ombuds_person_lemma
+    )
+
+def is_accused(ent):
+    first_token = ent[0]
+    accused_lemma = ["acusado", "acusada", "imputado", "imputada", "infractor", "infractora", "Acusado", "Acusada", "Imputado", "Imputada", "Infractor", "Infractora"]
+    return ent.label_ in ["PER", "LOC"] and (
+        first_token.nbor(-1).lemma_ in accused_lemma
+        or first_token.nbor(-2).lemma_ in accused_lemma
+        or first_token.nbor(-3).lemma_ in accused_lemma
+    )
+
+def is_advisor(ent):
+    first_token = ent[0]
+    advisor_lemma = ["asesor", "asesora", "Asesor", "Asesora"]
+    return ent.label_ in ["PER", "LOC"] and (
+        first_token.nbor(-1).lemma_ in advisor_lemma
+        or first_token.nbor(-2).lemma_ in advisor_lemma
+        or first_token.nbor(-3).lemma_ in advisor_lemma
     )
 
 
@@ -130,6 +159,10 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="SECRETARIX"))
             if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="FISCAL"))
+            if not is_from_first_tokens(ent.start) and is_ombuds_person(ent):
+                new_ents.append(Span(doc, ent.start, ent.end, label="DEFENSOR"))
+            if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
+                new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
             if not is_from_first_tokens(ent.start) and is_address(ent):
                 token_adicional = 1 if ent[-1].nbor().like_num else 0
                 new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
