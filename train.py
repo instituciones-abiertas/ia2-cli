@@ -258,7 +258,7 @@ class SpacyUtils:
         # callbacks["on_iteration"].append(update_best_scores())
 
         # for validation. activate if exists validation data
-        if False:
+        if settings["evaluate"] == "val":
             val_texts, val_annotations = zip(*validation_data)
         
         if len(testing_data) > 0:
@@ -301,7 +301,6 @@ class SpacyUtils:
                     state = cb(state, logger, nlp, optimizer)
 
             try:
-                
                 # compute validation scores
                 val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
                 if settings["evaluate"] == "val":
@@ -395,20 +394,25 @@ class SpacyUtils:
                     logger.info("Using GPU 🎮")
                 except:
                     logger.warning("❗ Either GPU not available or CUDA versions is not compatible")    
-
-            # train settings
-            dropout = utils.set_dropout(train_config, FUNC_MAP)
-            batch_size, batch_args = utils.set_batch_size(train_config, FUNC_MAP)
-
+            
+            # test dataset
             evaluate = "val"
             if "evaluate" in train_config and train_config["evaluate"] == "test":
                 evaluate = "test"
+
+            test_ds = ""
+            if "path_data_testing" in train_config:
+                test_ds = train_config["path_data_testing"]
+            
+            # train settings
+            dropout = utils.set_dropout(train_config, FUNC_MAP)
+            batch_size, batch_args = utils.set_batch_size(train_config, FUNC_MAP)
 
             # optimizer hyperparams
             optimizer = {}
             if "optimizer" in train_config:
                 optimizer = train_config["optimizer"]
-                        
+                       
             s = {
                 "dropout": dropout,
                 "optimizer": optimizer,
@@ -442,11 +446,11 @@ class SpacyUtils:
             train_config["epochs"],
             train_config["model_path"],
             train_config["entities"],
-            train_config["save_model_path"],
-            train_config["threshold"],
+            "", # prefered save_best_model callback
+            0, # prefered save_best_model callback
             train_config["is_raw"],
             train_config["path_data_validation"],
-            path_data_testing=train_config["path_data_testing"],
+            path_data_testing=test_ds,
             callbacks=c,
             settings=s,
             train_subset=train_config["train_subset"],
@@ -510,11 +514,12 @@ class SpacyUtils:
             if path_data_testing != "":
                 logger.info(f"loading pre-converted testing data JSON: {path_data_testing}")
                 with open(path_data_testing) as f:
-                    testing_data = json.load(f)        
+                    testing_data = json.load(f)
+                # mix train and validation data
+                training_data += validation_data  
+            else:
+                testing_data = []
 
-
-        # mix train and validation data
-        training_data += validation_data
         print("total data: ", len(training_data))    
 
         nlp = spacy.load(model_path)

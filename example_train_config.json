@@ -5,12 +5,11 @@
     "path_data_validation": "data/your_validation_data.json",
     "path_data_testing": "data/unified/testing.json",
     "is_raw": false,
-    "merge_train_val": true,
     "train_subset": 0,
     "model_path": "models/your_base_model/",
     "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
     "epochs": 20,
-    "optimizer": {"lr": 0.05},
+    "optimizer": {"learn_rate": 0.05},
     "dropout": 0.25,
     "batch_size":{"f": "compounding", "from": 6.0, "to": 12.0, "rate": 1.5},
     "callbacks": {
@@ -30,20 +29,18 @@
     }
   },
 
-  "example_finding_hyperparams": {
+  "example_tuning_hyperparams": {
     "use_gpu": false,
     "path_data_training": "data/your_train_data.json",
     "path_data_validation": "data/your_validation_data.json",
     "is_raw": false,
     "train_subset": 0,
     "model_path": "models/your_base_model/",
-    "save_model_path": "models/best",
     "entities": "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, PATENTE/DOMINIO",
-    "threshold": "80",
     "epochs": 40,
-    "optimizer": {},
-    "dropout": {},
-    "batch_size":{},
+    "optimizer": {"learn_rate": 0.0008},
+    "dropout": 0.3,
+    "batch_size": 4,
     "callbacks": {
       "on_iteration":[
         {"f": "print_scores_on_epoch"},
