@@ -10,6 +10,7 @@ import re
 import sys
 import spacy
 import time
+import shutil
 import utils
 from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
