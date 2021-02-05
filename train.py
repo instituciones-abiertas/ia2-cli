@@ -30,6 +30,10 @@ from callbacks import (
     change_dropout_fixed,
 )
 
+from spacy.pipeline import EntityRuler
+from pipeline_components.entity_ruler import ruler_patterns
+from pipeline_components.entity_matcher import EntityMatcher, matcher_patterns
+from pipeline_components.entity_custom import EntityCustom
 
 logger = logging.getLogger("Spacy cli util")
 logger.setLevel(logging.DEBUG)
@@ -38,7 +42,6 @@ logger_fh.setLevel(logging.DEBUG)
 formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(message)s")
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
-
 
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
@@ -219,11 +222,11 @@ class SpacyUtils:
     # =================================
 
     def get_best_model(
-        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], callbacks={}, settings={}
+        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}
     ):
         init_time = time.time()
         print("\nsettings", settings)
-
+        optimizer = utils.set_optimizer(optimizer, **settings["optimizer"])
         state = {
             "i": 0,
             "epochs": n_iter,
@@ -249,30 +252,29 @@ class SpacyUtils:
             "max_val_f_score": 0,
             "max_val_recall": 0,
             "max_val_precision": 0,
-            "lr": settings["lr"],
-            "beta1": settings["beta1"],
+            "lr": optimizer.learn_rate,
             "dropout": settings["dropout"],
             "elapsed_time": 0,
             "stop": False,
+            "evaluate_test": False
         }
 
-        print(state)
+        # for validation. activate if exists validation data
+        if settings["evaluate"] == "val":
+            val_texts, val_annotations = zip(*validation_data)
+        
+        if len(testing_data) > 0:
+            test_texts, test_annotations = zip(*testing_data)    
 
-        # callback
-        # callbacks["on_iteration"].append(update_best_scores())
-
-        # for validation
-        val_texts, val_annotations = zip(*validation_data)
         tr_texts, tr_annotations = zip(*training_data)
 
         while not state["stop"] and state["i"] < state["epochs"]:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
-
+                    
             # set/update Adam optimizer from state
             optimizer.learn_rate = state["lr"]
-            optimizer.beta1 = state["beta1"]
 
             if len(settings["batch_args"]) > 0:
                 batch_size = settings["batch_size"](*settings["batch_args"])
@@ -282,12 +284,12 @@ class SpacyUtils:
             # Creates mini batches
             batches = minibatch(training_data, size=batch_size)
             num_batches = 0
-            bz = []
+            #bz = []
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
 
-                bz.append(len(texts))
+                #bz.append(len(texts))
                 nlp.update(
                     texts,  # batch of raw texts
                     annotations,  # batch of annotations
@@ -301,16 +303,18 @@ class SpacyUtils:
                     state = cb(state, logger, nlp, optimizer)
 
             try:
-                print(bz)
                 # compute validation scores
-                val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, val_texts, val_annotations
-                )
-
+                val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
+                if settings["evaluate"] == "val":
+                    val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
+                        optimizer, nlp, val_texts, val_annotations
+                    )
+                
                 # train data score
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
                     optimizer, nlp, tr_texts, tr_annotations
                 )
+
                 numero_losses = losses.get("ner")
 
             except Exception:
@@ -337,6 +341,21 @@ class SpacyUtils:
             for cb in callbacks["on_iteration"]:
                 state = cb(state, logger, nlp, optimizer)
 
+            # compute testing dataset scores
+            # Since we can save many models if some threshold has been reached
+            # during the train loop. We also want to get scores on test data
+            # for each one of this models.         
+            if settings["evaluate"] == "test" and state["evaluate_test"]:
+                test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
+                    optimizer, nlp, test_texts, test_annotations
+                )
+                logger.info("############################################################")
+                logger.info(f"Evaluating saved model with test data")
+                logger.info(f"Scores :f1-score: {test_f_score}, precision: {test_precision_score}")
+                logger.info(f"{test_per_type_score}")
+                logger.info("############################################################")
+                
+            state["evaluate_test"] = False
             state["i"] += 1
 
         # Run callbacks after train loop
@@ -367,19 +386,42 @@ class SpacyUtils:
             with open("train_config.json") as f:
                 train_config = json.load(f)
                 train_config = train_config[config]
+            # GPU
+            # if GPU enabled
 
+            if "use_gpu" in train_config and train_config["use_gpu"] == True:
+                try:
+                    import cupy
+                    spacy.prefer_gpu()
+                    logger.info("Using GPU 🎮")
+                except:
+                    logger.warning("❗ Either GPU not available or CUDA versions is not compatible")    
+            
+            # test dataset
+            evaluate = "val"
+            if "evaluate" in train_config and train_config["evaluate"] == "test":
+                evaluate = "test"
+
+            test_ds = ""
+            if "path_data_testing" in train_config:
+                test_ds = train_config["path_data_testing"]
+            
             # train settings
-            lr, beta1 = utils.set_lr_and_beta1(train_config)
             dropout = utils.set_dropout(train_config, FUNC_MAP)
             batch_size, batch_args = utils.set_batch_size(train_config, FUNC_MAP)
 
+            # optimizer hyperparams
+            optimizer = {}
+            if "optimizer" in train_config:
+                optimizer = train_config["optimizer"]
+                       
             s = {
-                "lr": lr,
-                "beta1": beta1,
                 "dropout": dropout,
+                "optimizer": optimizer,
                 # "dropout_args": dropout_args,
                 "batch_size": batch_size,
                 "batch_args": batch_args,
+                "evaluate": evaluate
             }
 
             on_iter_cb = []
@@ -406,10 +448,11 @@ class SpacyUtils:
             train_config["epochs"],
             train_config["model_path"],
             train_config["entities"],
-            train_config["save_model_path"],
-            train_config["threshold"],
+            "", # prefered save_best_model callback
+            0, # prefered save_best_model callback
             train_config["is_raw"],
             train_config["path_data_validation"],
+            path_data_testing=test_ds,
             callbacks=c,
             settings=s,
             train_subset=train_config["train_subset"],
@@ -425,6 +468,7 @@ class SpacyUtils:
         max_losses: float,
         is_raw: bool = True,
         path_data_validation: str = "",
+        path_data_testing: str = "",
         callbacks={},
         settings={},
         train_subset=0,
@@ -451,8 +495,14 @@ class SpacyUtils:
         if is_raw:
             logger.info(f"loading and converting training data from dataturks: {path_data_training}")
             training_data = convert_dataturks_to_spacy(path_data_training, ents)
+
             if path_data_validation != "":
+                logger.info(f"loading and converting validation data from dataturks: {path_data_training}")
                 validation_data = convert_dataturks_to_spacy(path_data_training, ents)
+               
+            if path_data_testing != "":
+                logger.info(f"loading and converting testing data from dataturks: {path_data_training}")
+                testing_data = convert_dataturks_to_spacy(path_data_testing, ents)
         else:
             logger.info(f"loading pre-converted training data JSON: {path_data_training}")
             with open(path_data_training) as f:
@@ -462,6 +512,17 @@ class SpacyUtils:
                 logger.info(f"loading pre-converted validation data JSON: {path_data_validation}")
                 with open(path_data_validation) as f:
                     validation_data = json.load(f)
+
+            if path_data_testing != "":
+                logger.info(f"loading pre-converted testing data JSON: {path_data_testing}")
+                with open(path_data_testing) as f:
+                    testing_data = json.load(f)
+                # mix train and validation data
+                training_data += validation_data  
+            else:
+                testing_data = []
+
+        #print("total data: ", len(training_data))    
 
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
@@ -483,7 +544,10 @@ class SpacyUtils:
         with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
-            optimizer = nlp.begin_training()
+
+            # NOTE these configs are not yet well documented in SpaCy 2
+            # please read this https://github.com/explosion/spaCy/issues/5513#issuecomment-635169316
+            optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 64}})
 
             # we save the first model and then we update it if there is a better version of it
             logger.info(f"💾 Saving initial model")
@@ -506,9 +570,10 @@ class SpacyUtils:
                 }
 
             # TODO default settings just in case not using train_config.json
-
             if train_subset > 0:
-                training_data = training_data[:train_subset]
+                training_data = random.sample(training_data, train_subset)
+                logger.info(f"Using a random subset of {train_subset} texts")
+
 
             self.get_best_model(
                 optimizer,
@@ -517,6 +582,7 @@ class SpacyUtils:
                 training_data,
                 path_best_model,
                 validation_data=validation_data,
+                testing_data=testing_data,
                 callbacks=callbacks,
                 settings=settings,
             )
@@ -591,6 +657,82 @@ class SpacyUtils:
             ents_per_type_sum,
         )
 
+    def build_model_package(
+        self, model_path: str, package_path: str, model_name: str, model_version: str, model_components: str
+    ):
+        """
+        Add rules updating the model to the given path and package model
+
+        :param model_path: A model path
+        :param package_path: A package path
+        :param model_name: A new model name
+        :param model_version: A new model version
+        :param model_components: A model components path
+        """
+        nlp = spacy.load(model_path)
+
+        nlp.meta["name"] = model_name
+        nlp.meta["version"] = str(model_version)
+
+        ruler = EntityRuler(nlp, overwrite_ents=True)
+        ruler.add_patterns(ruler_patterns)
+        nlp.add_pipe(ruler)
+
+        entity_matcher = EntityMatcher(nlp, matcher_patterns)
+        nlp.add_pipe(entity_matcher)
+
+        entity_custom = EntityCustom(nlp)
+        nlp.add_pipe(entity_custom)
+
+        nlp.to_disk(model_path)
+        logger.info(f'Succesfully added rule based mathching at model: "{model_path}".')
+
+        package(model_path, package_path)
+        logger.info(f'Succesfully package at model: "{package_path}".')
+
+        package_name = nlp.meta["lang"] + "_" + nlp.meta["name"]
+        package_dir = package_name + "-" + nlp.meta["version"]
+        package_base_path = os.path.join(package_path, package_dir, package_name)
+
+        # Copio archivos con modulos custom al directorio pipe_components (no uso model_components para que sea fijo y siempre el mismo en nuestro componente, y asi poder desacoplarlo de cuando tengamos multiples clientes
+        package_components_dir = "pipeline_components"
+        files_src = ["entity_matcher.py", "entity_custom.py"]
+        dest_component_dir = os.path.join(package_base_path, package_dir, package_components_dir)
+        os.mkdir(dest_component_dir)
+        for f in files_src:
+            dest = os.path.join(dest_component_dir, f)
+            orig = os.path.join(model_components, f)
+            shutil.copyfile(orig, dest)
+
+        new_code = f"""
+            import os
+            import importlib
+            from spacy.language import Language
+            def import_path(path):
+                module_name = os.path.basename(path).replace('-', '_').replace('.','-')
+                spec = importlib.util.spec_from_file_location(module_name, path)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                return mod
+            
+            dir =  os.fspath(Path(__file__).parent)
+            moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
+            moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
+            
+            Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+            Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
+        """
+
+        insert_line = 6
+        package_filename = "__init__.py"
+        init_py = os.path.join(package_base_path, package_filename)
+        with open(init_py, "r") as f:
+            content = f.readlines()
+        with open(init_py, "w") as f:
+            for c in new_code.splitlines()[::-1]:
+                content.insert(insert_line, c + "\n")
+            f.writelines(content)
+        logger.info("Succesfully write language factories to model")
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
