@@ -21,6 +21,7 @@ def example(param="value"):
 def print_scores_on_epoch(validation=True):
   """
   write the scores/loss in the log file
+  :param validation when this value is false validation scores aren't printed
   """
   def print_scores_cb(state, logger, model, optimizer):
     e = state["i"] + 1
@@ -51,6 +52,9 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score", mode=
   :param path_best_model where to save the model
   :param threshold value to reach in order to save the first time
   :param score value to be considered
+  :param mode gives the possibility to use scores with minimun like "ner" loss as trigger. 
+  posible values "min" or "max"
+  :param test boolean value used to trigger a score evaluation with test dataset
   """
   def save_best_model_cb(state, logger, model, optimizer):
     save = False
@@ -73,34 +77,6 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score", mode=
     return state
 
   return save_best_model_cb
-
-def test_and_save(path_best_model="", threshold=15000, score="ner", mode="min"):
-  """
-  Triggers an evaluation, and if the evaluation pass the score then saves the model
-  
-  :param path_best_model where to save the model
-  :param threshold value to reach in order to save the first time
-  :param score value to be considered
-  """
-  def test_and_save_cb(state, logger, model, optimizer):
-    save = False
-    
-    if mode == "max":
-      save = (state["history"][score][-1] >= threshold)  and  (state["history"][score][-1] > state["max_"+score])
-    elif mode == "min":
-      save = (state["history"][score][-1] <= threshold)  and  (state["history"][score][-1] < state["min_"+score])
-
-    if save:
-        e = state["i"]+1
-        with model.use_params(optimizer.averages):
-            model.to_disk(path_best_model)
-            logger.info(f"💾 Saving model for epoch {e}")
-            # change this flag to 
-            state["evaluate_test"] = True
-
-    return state
-
-  return test_and_save_cb
 
 def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last_chance=True):
   """
@@ -162,6 +138,7 @@ def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
 def update_best_scores(validation=True):
   """
   Update max or min scores in state based on history
+  :param validation when this value is false validation scores are excluded
   """
   def update_best_scores_cb(state, logger, model, optimizer):
     # max and min
@@ -224,6 +201,7 @@ def change_dropout_fixed(step=0.01, until=0.5):
 def log_best_scores(validation=True):
   """
   Logs the max/mins from state
+  :param validation when this value is false validation scores are excluded
   """
   def log_best_scores_cb(state, logger, model, optimizer):
     logger.info("\n\n")
@@ -251,6 +229,7 @@ def save_csv_history(filename="history.csv", session="", validation=True):
   Save history values to csv file
   :param filename file where to write the csv rows
   :param session session id. If blank a date string is used in each call
+  :param validation when this value is false validation scores are excluded
   """
   def save_csv_history_cb(state, logger, model, optimizer):
     path = f"history/{filename}"
