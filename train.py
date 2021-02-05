@@ -341,7 +341,7 @@ class SpacyUtils:
 
             # compute testing dataset scores
             # Since we can save many models if some threshold has been reached
-            # dusring the train loop. We also want to get scores on test data
+            # during the train loop. We also want to get scores on test data
             # for each one of this models.         
             if settings["evaluate"] == "test" and state["evaluate_test"]:
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
