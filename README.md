@@ -88,7 +88,7 @@ python train.py train train_config
 ```
 
 El archivo de configuración `train_config.json` se debe generar a partir de `example_train_config.json`. Los parámetros disponibles para modificar son:
-- `use_gpu`: valor booleano que determina si correr o no el entrenamiento usando el gpu. Se debe tener configurado CUDA toolkit y seguir este instructivo : [Ejecutar SpaCy con GPU](https://spacy.io/usage/#gpu).  **Nota**: tener en cuanta que el batch size afecta directamente el uso de memoria.
+- `use_gpu`: valor booleano que determina si correr o no el entrenamiento usando el gpu. Se debe tener configurado CUDA toolkit y seguir este instructivo : [Ejecutar SpaCy con GPU](https://spacy.io/usage/#gpu).  **Nota**: tener en cuenta que el batch size afecta directamente el uso de memoria.
 - `path_data_training`: directorio de la data para entrenar el modelo 
 - `path_data_validation`: directorio de la data de validación para evaluar el modelo
 - `path_data_testing`: directorio de la data de testing para evaluar el modelo. Si está incluida esta opción los conjuntos de entrenamiento y validación serán combinados y utilizados para entrenamiento. Ver [F. Chollet, _Deep Learning in Python_ , cap. 4.2](https://livebook.manning.com/book/deep-learning-with-python/chapter-4/44)
