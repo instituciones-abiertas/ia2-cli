@@ -1,5 +1,5 @@
 from spacy.tokens import Span
-import re
+import re 
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
