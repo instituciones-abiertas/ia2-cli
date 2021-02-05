@@ -1,5 +1,5 @@
 from spacy.tokens import Span
-
+import re
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -89,6 +89,13 @@ def is_advisor(ent):
         or first_token.nbor(-3).lemma_ in advisor_lemma
     )
 
+def is_ip_address(ent):
+    first_token = ent[0]
+    octet_rx = r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
+    pattern = re.compile(r"^{0}(?:\.{0}){{3}}$".format(octet_rx))
+    is_ip = pattern.match(str(ent))
+    return ent.label_ in ["NUM", "NUM_IP"] and is_ip
+
 
 def is_address(ent):
     first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
@@ -166,6 +173,8 @@ class EntityCustom(object):
             if not is_from_first_tokens(ent.start) and is_address(ent):
                 token_adicional = 1 if ent[-1].nbor().like_num else 0
                 new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+            if not is_from_first_tokens(ent.start) and is_ip_address(ent):
+                new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
 
         if new_ents:
             filtered_ents = filter_spans(doc.ents, new_ents)
