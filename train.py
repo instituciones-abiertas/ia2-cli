@@ -705,24 +705,24 @@ class SpacyUtils:
             orig = os.path.join(model_components, f)
             shutil.copyfile(orig, dest)
 
-        new_code = f"""
-            import os
-            import importlib
-            from spacy.language import Language
-            def import_path(path):
-                module_name = os.path.basename(path).replace('-', '_').replace('.','-')
-                spec = importlib.util.spec_from_file_location(module_name, path)
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-                return mod
-            
-            dir =  os.fspath(Path(__file__).parent)
-            moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
-            moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
-            
-            Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
-            Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
-        """
+# NOTE indentation in this string leads to model error
+        new_code = f"""import os
+import importlib
+from spacy.language import Language
+def import_path(path):
+    module_name = os.path.basename(path).replace('-', '_').replace('.','-')
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+    
+dir =  os.fspath(Path(__file__).parent)
+moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
+moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
+    
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
+"""
 
         insert_line = 6
         package_filename = "__init__.py"
