@@ -54,7 +54,11 @@ Closes: #420
 
 > Las siguientes opciones en **negrita** son necesarias para la aprobación del PR. Marque las casillas solo si es necesario, nos ayuda a minimizar el proceso de revisión.
 
-<!-- Editar a continuación -->
+<!-- Marcar a continuación las que corresponden con sus cambios.
+  Ejemplo:
+  [x] <Opción que corresponde>
+  [ ] <Opción que no corresponde>
+-->
 
 -   [ ] **He realizado una autoevaluación de mi propio código.**
 -   [ ] He comentado mi código, especialmente en áreas difíciles de entender.

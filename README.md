@@ -58,7 +58,7 @@ Agregar las entidades que nos interesan detectar en el modelo
 ```bash
 python train.py add_new_entity_to_model \
   "PER,LOC,DIRECCIÓN,OCUPACIÓN/PROFESIÓN,PATENTE_DOMINIO,ARTÍCULO" \
-  "models/base/2021-01-19" \
+  "models/base/2021-01-19"
 ```
 
 Entrenar un modelo
@@ -102,13 +102,13 @@ python train.py create_custom_spacy_model \
 ```bash
 python train.py add_new_entity_to_model \
   <ents> \
-  <model_path> \
+  <model_path>
 ```
 
 ```bash
 python train.py add_new_entity_to_model \
 "PER,LOC,DIRECCIÓN" \
-"models/base/2021-01-19" \
+"models/base/2021-01-19"
 ```
 
 ### Entrenamiento de modelo
@@ -178,9 +178,9 @@ El siguiente comando transforma una serie de documentos `.json` en formato datat
 
 ```bash
 python train.py convert_dataturks_to_train_file \
-  <input_files_path>
-  <entities>
-  <output_file_path>
+  <input_files_path> \
+  <entities> \
+  <output_file_path> \
   <num_files>
 ```
 

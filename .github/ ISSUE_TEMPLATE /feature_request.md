@@ -6,7 +6,7 @@
 
 *Insertar descripción clara y concisa del comportamiento deseado.*
 
-**Describa alternativas consideras como solución**
+**Describa alternativas que considere como solución**
 
 *Insertar descripción clara y concisa de cualquier otra alternativa de solución que haya considerado.*
 
