@@ -93,6 +93,9 @@ def save_state_history(
   state["history"]["batches"].append(num_batches)
   state["history"]["dropout"].append(dropout)
 
+  # this works if  iteration callacks are called later  
+  state["history"]["saved"].append("")
+
 
 def show_text(files_path: str, entity: str, context_words=0):
   """
