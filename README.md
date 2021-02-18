@@ -1,5 +1,13 @@
 # IA² | Línea de comandos
 
+<p align="center">
+  <a target="_blank" rel="noopener noreferrer">
+    <img width="220px" src="public/images/ia2-logo.png" alt="IA²" />
+  </a>
+</p>
+<br/>
+<h4 align="center">Línea de comandos del proyecto IA²</h4>
+
 ## Stack Tecnológico
 
 - Python, versión 3.7.6
