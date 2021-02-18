@@ -223,7 +223,7 @@ class SpacyUtils:
     # =================================
 
     def get_best_model(
-        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}
+        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}, disabled_pipes=[]
     ):
         init_time = time.time()
         print("\nsettings", settings)
@@ -245,6 +245,7 @@ class SpacyUtils:
                 "lr": [],
                 "batches": [],  # processed batches
                 "dropout": [],
+                "saved": []
             },
             "min_ner": 0,
             "max_f_score": 0,
@@ -301,7 +302,7 @@ class SpacyUtils:
 
                 # run batch callbacks
                 for cb in callbacks["on_batch"]:
-                    state = cb(state, logger, nlp, optimizer)
+                    state = cb(state, logger, nlp, optimizer, disabled_pipes)
 
             try:
                 # compute validation scores
@@ -340,7 +341,7 @@ class SpacyUtils:
             # run callbacks after each iteration
 
             for cb in callbacks["on_iteration"]:
-                state = cb(state, logger, nlp, optimizer)
+                state = cb(state, logger, nlp, optimizer, disabled_pipes)
 
             # compute testing dataset scores
             # Since we can save many models if some threshold has been reached
@@ -362,7 +363,7 @@ class SpacyUtils:
         # Run callbacks after train loop
         state["elapsed_time"] = (time.time() - init_time) / 60
         for cb in callbacks["on_stop"]:
-            state = cb(state, logger, nlp, optimizer)
+            state = cb(state, logger, nlp, optimizer, disabled_pipes)
 
     def train(self, config: str):
         """
@@ -529,7 +530,7 @@ class SpacyUtils:
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
-
+        
         # Creates a ner pipe if it does not exist.
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
@@ -539,10 +540,10 @@ class SpacyUtils:
         for _, annotations in training_data:
             for ent in annotations.get("entities"):
                 ner.add_label(ent[2])
-        # Save disable pipelines
+        # Save disable pipelines for further restoring
         disabled_pipes = nlp.disable_pipes(*other_pipes)
-
-        with nlp.disable_pipes(*other_pipes), warnings.catch_warnings():
+        
+        with warnings.catch_warnings():            
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
 
@@ -550,9 +551,12 @@ class SpacyUtils:
             # please read this https://github.com/explosion/spaCy/issues/5513#issuecomment-635169316
             optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 64}})
 
+            # this initial save remove the pipelines from base model and is not restoring them
+            # 
+            #
             # we save the first model and then we update it if there is a better version of it
-            logger.info(f"💾 Saving initial model")
-            nlp.to_disk(model_path)
+            # logger.info(f"💾 Saving initial model")
+            # nlp.to_disk(model_path)
 
             # adding plugins for each step of train loop train loop
             # these are default callbacks
@@ -586,6 +590,7 @@ class SpacyUtils:
                 testing_data=testing_data,
                 callbacks=callbacks,
                 settings=settings,
+                disabled_pipes=disabled_pipes
             )
 
 

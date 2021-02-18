@@ -10,7 +10,7 @@ def example(param="value"):
   """
   This is just a model of callback.
   """
-  def example_cb(state, logger, model, optimizer):
+  def example_cb(state, logger, model, optimizer, disabled_pipes):
     return state
 
   return example_cb
@@ -23,7 +23,7 @@ def print_scores_on_epoch(validation=True):
   write the scores/loss in the log file
   :param validation when this value is false validation scores aren't printed
   """
-  def print_scores_cb(state, logger, model, optimizer):
+  def print_scores_cb(state, logger, model, optimizer, disabled_pipes):
     e = state["i"] + 1
     ner = state["history"]["ner"][-1]
     f_score = state["history"]["f_score"][-1]
@@ -49,14 +49,14 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score", mode=
   Save the model if the epoch score is more than the threshold
   or if current score is a new max.
 
-  :param path_best_model where to save the model
+  :param path_best_model where to save the model. This callback add this path to the history when saved
   :param threshold value to reach in order to save the first time
   :param score value to be considered
   :param mode gives the possibility to use scores with minimun like "ner" loss as trigger. 
   posible values "min" or "max"
   :param test boolean value used to trigger a score evaluation with test dataset
   """
-  def save_best_model_cb(state, logger, model, optimizer):
+  def save_best_model_cb(state, logger, model, optimizer, disabled_pipes):
     save = False
     
     if mode == "max":
@@ -65,14 +65,28 @@ def save_best_model(path_best_model="", threshold=40, score="val_f_score", mode=
       save = (state["history"][score][-1] <= threshold)  and  (state["history"][score][-1] < state["min_"+score])
 
     if save:
-        e = state["i"]+1
-        if test:
-          # change this flag to 
-            state["evaluate_test"] = True
-            
-        with model.use_params(optimizer.averages):
-            model.to_disk(path_best_model)
-            logger.info(f"💾 Saving model for epoch {e}")
+      e = state["i"]+1
+      if test:
+        # change this flag to 
+        state["evaluate_test"] = True
+
+      # add pipes for the current model
+      for pipe in disabled_pipes:        
+        model.add_pipe(pipe[1], before="ner")
+
+      with model.use_params(optimizer.averages):
+        
+        model.to_disk(path_best_model)
+        print("Saving model with the following pipes", model.pipe_names)
+        logger.info(f"💾 Saving model for epoch {e}")
+        state["history"]["saved"][state["i"]] = path_best_model
+      
+      #  disble other pipes
+      pipe_exceptions = ["ner"]
+      other_pipes = [pipe for pipe in model.pipe_names if pipe not in pipe_exceptions]
+      disabled_pipes = model.disable_pipes(*other_pipes)
+      # since model is a reference for nlp, ensure the train continues only with ner
+      assert len(model.pipe_names) == 1 and model.pipe_names[0] == "ner", "Model must be trained only with the ner pipe"
 
     return state
 
@@ -90,7 +104,7 @@ def reduce_lr_on_plateau(step=0.001, epochs=4, diff=1, score="val_f_score", last
   :param score score used to calculate the diff
   :param last_chance gives an extra oportunity if the last epoch has a positive diff
   """
-  def reduce_lr_on_plateau_cb(state, logger, model, optimizer):
+  def reduce_lr_on_plateau_cb(state, logger, model, optimizer, disabled_pipes):
     if len(state["history"][score]) > epochs and state["lr"] > step:
       delta = np.diff(state["history"][score])[-epochs:]
 
@@ -117,7 +131,7 @@ def early_stop(epochs=10, score="val_f_score", diff=5, last_chance=True):
   :param score score used to calculate the diff
   :param last_chance gives an extra oportunity if the last epoch has a positive diff
   """
-  def early_stop_cb(state, logger, model, optimizer):
+  def early_stop_cb(state, logger, model, optimizer, disabled_pipes):
     if len(state["history"][score]) > epochs:
       delta = np.diff(state["history"][score])[-epochs:]
 
@@ -140,7 +154,7 @@ def update_best_scores(validation=True):
   Update max or min scores in state based on history
   :param validation when this value is false validation scores are excluded
   """
-  def update_best_scores_cb(state, logger, model, optimizer):
+  def update_best_scores_cb(state, logger, model, optimizer, disabled_pipes):
     # max and min
     state["min_ner"] = min(state["history"]["ner"])
     state["max_f_score"] = max(state["history"]["f_score"])
@@ -162,7 +176,7 @@ def sleep(secs=0.5, log=False):
   This is experimental, however has improved loop performances
   in some cases.
   """
-  def sleep_cb(state, logger, model, optimizer):
+  def sleep_cb(state, logger, model, optimizer, disabled_pipes):
     if log:
       logger.info(f"😴😴😴 sleeping for {secs} secs")
     time.sleep(secs)
@@ -177,7 +191,7 @@ def change_dropout_fixed(step=0.01, until=0.5):
   :param step amount to change per epoch
   :param until limit for dropout change  
   """
-  def change_dropout_fixed_cb(state, logger, model, optimizer):
+  def change_dropout_fixed_cb(state, logger, model, optimizer, disabled_pipes):
 
     state["dropout"]
     if  step > 0 and state["dropout"] < until:
@@ -203,7 +217,7 @@ def log_best_scores(validation=True):
   Logs the max/mins from state
   :param validation when this value is false validation scores are excluded
   """
-  def log_best_scores_cb(state, logger, model, optimizer):
+  def log_best_scores_cb(state, logger, model, optimizer, disabled_pipes):
     logger.info("\n\n")
     logger.info("-------🏆-BEST-SCORES-🏅----------")
     e = state["i"]
@@ -231,7 +245,7 @@ def save_csv_history(filename="history.csv", session="", validation=True):
   :param session session id. If blank a date string is used in each call
   :param validation when this value is false validation scores are excluded
   """
-  def save_csv_history_cb(state, logger, model, optimizer):
+  def save_csv_history_cb(state, logger, model, optimizer, disabled_pipes):
     path = f"history/{filename}"
     logger.info("\n\n")
     logger.info(f"[save_csv_history] 💾 Saving history in a {path} file")
