@@ -1,15 +1,24 @@
 # Text Editors
 .vscode
 
-# Training and Output data
-data
-output
-history
-
+# Training Configuration
 train_config.json
 
 # Spacy Models
-models
+models/*
+!models/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Training History
+history/*
+!history/.gitkeep
+
+# Datasets
+data/*
+!data/.gitkeep
 
 # Misc
 __pycache__

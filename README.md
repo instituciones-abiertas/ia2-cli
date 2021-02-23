@@ -1,28 +1,83 @@
-## Util para entrenar Spacy
+# IA² | Línea de comandos
 
-#### Stack
+<p align="center">
+  <a target="_blank" rel="noopener noreferrer">
+    <img width="220px" src="public/images/ia2-logo.png" alt="IA²" />
+  </a>
+</p>
+<br/>
+<h4 align="center">Línea de comandos del proyecto IA²</h4>
 
-- Python
+## Stack Tecnológico
+
+- Python, versión 3.7.6
 - [Fire](https://github.com/google/python-fire)
 - [Spacy](https://spacy.io/)
 
-#### Pre-requisitos:
+## Instalación
 
-Instalar las dependencias necesarias:
+> Se recomienda instalar alguna herramienta para administrar versiones de python, como [pyenv](https://github.com/pyenv/pyenv) y alguna extensión para los ambientes virtuales, por ejemplo: [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/).
+
+Instalación de dependencias
 
 ```bash
 pip install -r requirements.txt
 ```
-***Inicializar precomitt en el repo***
-Es necesario instalar  precommit en el repo:
+
+## Ambiente de desarrollo
+
+***Inicializar la herramienta*** `precommit` ***para el control de sintaxis.***
+
 ```bash
 pre-commit install
-
 ```
 
+## Consideraciones
 
+El proyecto no cuenta con datasets iniciales. Para construir nuestros dataset de entrenamiento y validación iniciales se utilizó la herramienta de etiquetado [Dataturks](http://dataturks.com/).
 
-#### Helper
+La línea de comandos contiene herramientas para transformar el etiquetado Dataturks a datasets soportados por Spacy. Para más información consulte el comando de ayuda de la línea de comandos.
+
+## Circuito básico de prueba
+
+El siguiente circuito de prueba contempla los siguientes procesos:
+
++ Descargar un modelo de spacy para utilizar como modelo base.
++ Creación de un modelo base
++ Agregar entidades al pipeline de reconocimiento de nombre de entidades del modelo base.
++ Ejecutar el entrenamiento, basándose en la configuración dada por el archivo de ejemplo `example_train_config.json`.
+
+Descargar un modelo base
+
+```bash
+python -m spacy download es_core_news_lg
+```
+
+Crear un modelo basado en `es_core_news_lg`
+
+```bash
+python train.py create_custom_spacy_model \
+  "es_core_news_lg" \
+  "models/base/2021-01-19"
+```
+
+Agregar las entidades que nos interesan detectar en el modelo
+
+```bash
+python train.py add_new_entity_to_model \
+  "PER,LOC,DIRECCIÓN,OCUPACIÓN/PROFESIÓN,PATENTE_DOMINIO,ARTÍCULO" \
+  "models/base/2021-01-19"
+```
+
+Entrenar un modelo
+
+```bash
+python train.py example_train_config example_tuning_hyperparams
+```
+
+## Línea de Comandos
+
+### Ayuda
 
 El flag `--help` proporciona información de los scripts disponibles.
 
@@ -30,15 +85,7 @@ El flag `--help` proporciona información de los scripts disponibles.
 python train.py --help
 ```
 
-## Circuito basico de prueba
-
-#### Descargar un modelo base
-
-```bash
-python -m spacy download es_core_news_lg
-```
-
-#### Crear un modelo vacío
+### Crear un modelo base
 
 - `model_name`: nombre del modelo a utilizar como base del nuevo
 - `output_path`: directorio donde se almacenará el nuevo modelo
@@ -52,10 +99,10 @@ python train.py create_custom_spacy_model <model_name> <output_path>
 ```bash
 python train.py create_custom_spacy_model \
   "es_core_news_lg" \
-  "models/base/2020-12-01"
+  "models/base/2021-01-19"
 ```
 
-#### Agregar entidades a un modelo
+### Agregar entidades a un modelo
 
 - `ents`: Strings de las entidades sin espacio
 - `model_path`: directorio del modelo custom a utilizar
@@ -63,17 +110,18 @@ python train.py create_custom_spacy_model \
 ```bash
 python train.py add_new_entity_to_model \
   <ents> \
-  <model_path> \
+  <model_path>
 ```
 
 ```bash
 python train.py add_new_entity_to_model \
-"PER,LOC,DIRECCIÓN,OCUPACIÓN/PROFESIÓN,PATENTE_DOMINIO,ARTÍCULO" \
-modelos/modelo10-12 \
+"PER,LOC,DIRECCIÓN" \
+"models/base/2021-01-19"
 ```
 
-#### Entrenar un modelo
-Dicho entrenamiento guardará el mejor modelo (siempre que supere el threshold - leer parámetros de configuración), así como un archivo `history.csv` en la carpeta history (en la raiz del proyecto) en el que se explicitan parámetros y scores obtenidos por época (epoch).
+### Entrenamiento de modelo
+
+El entrenamiento guardará el mejor modelo (siempre que supere el threshold - leer parámetros de configuración), así como un archivo `history.csv` en la carpeta history (en la raiz del proyecto) en el que se explicitan parámetros y scores obtenidos por época (epoch).
 
 - `config_name`: nombre de la configuración que se usará para entrenar el modelo, dicha debería estar en un archivo de configuración con el nombre `train_config.json`. 
 
@@ -84,10 +132,11 @@ python train.py train <config_name>
 **Ejemplo:**
 
 ```bash
-python train.py train train_config
+python train.py train example_tuning_hyperparams
 ```
 
 El archivo de configuración `train_config.json` se debe generar a partir de `example_train_config.json`. Los parámetros disponibles para modificar son:
+
 - `use_gpu`: valor booleano que determina si correr o no el entrenamiento usando el gpu. Se debe tener configurado CUDA toolkit y seguir este instructivo : [Ejecutar SpaCy con GPU](https://spacy.io/usage/#gpu).  **Nota**: tener en cuenta que el batch size afecta directamente el uso de memoria.
 - `path_data_training`: directorio de la data para entrenar el modelo 
 - `path_data_validation`: directorio de la data de validación para evaluar el modelo
@@ -105,10 +154,9 @@ El archivo de configuración `train_config.json` se debe generar a partir de `ex
 - `batch_size`: tamaño del batch (cantidad de textos) a utilizar para entrenar el modelo (número entero)
 - `callbacks`: representa un objeto de arrays de callbacks a ser usados en el entrenamiento. Para ver dichas funciones ir al archivo `callbacks.py`.
 
+### Reconocimiento con Displacy
 
-#### Utilizar Displacy para probar entidades en un modelo
-
-El siguiente comando permite visualizar resultados de un entrenamiento utilizando [displayCy](https://spacy.io/api/top-level#displacy). Disponibiliza un servidor en el puerto `5030`.
+El siguiente comando permite visualizar rapidamente resultados de un entrenamiento utilizando [displayCy](https://spacy.io/api/top-level#displacy). Disponibiliza un servidor en el puerto `5030`.
 
 - `model_path`: directorio del modelo a utilizar para las pruebas
 - `test_text`: string que represente un texto de prueba
@@ -121,91 +169,87 @@ python train.py display_text_prediction <model_path> <test_text>
 
 ```bash
 python train.py display_text_prediction \
-  models/base/2020-12-01 \
+  models/base/2021-01-19 \
   "Soy un texto de prueba para detectar alguna entidad"
 ```
 
 > Luego visitar `localhost:5030` desde un navegador.
 
-#### Utilizar Scorer para probar el modelo y obtener información sobre los resultados de pruebas
+### Conversion de datasets
 
-- `model_path`: directorio del modelo a utilizar para las pruebas
-- `test_text`: string que represente un texto de prueba
-- `annotations`: lista de ocurrencias de etiquetas `[(`)]`
+El siguiente comando transforma una serie de documentos `.json` en formato dataturks a un dataset único, también en formato `.json`, soportado por la CLI de IA².
 
-```bash
-python train.py evaluate <model_path> <test_text> <annotations>
-```
-
-**Ejemplo:**
-
-```bash
-python train.py scorer_model \
-  models/base/2020-12-01 \
-  "Carlos Alberto Mersu 99.999.999, Gabigol 23.213.456 y Tefi estaba en la hamaca con el dni 99999999" \
-  [(41,51,"NUM_DNI")]
-```
-
-#### Conversion de datasets
-
-El siguiente comando transforma una serie de documentos `.json` en formato dataturks a un dataset único, también en formato `.json`, soportado por la CLI de Spacy.
+- `input_files_path`: directorio de archivos en formato dataturks
+- `entities`: string que representa una lista de entidades, separadas por coma
+- `output_file_path`: directorio de salida del dataset generado
+- `num_files`: número de archivos que serán incluídos en la creación del dataset. Por defecto es `0` e incluye todos los archivos alojados en el directorio.
 
 ```bash
 python train.py convert_dataturks_to_train_file \
   <input_files_path> \
   <entities> \
-  <output_file_path>
+  <output_file_path> \
+  <num_files>
+```
+
+**Ejemplo:**
+
+Asume la existencia de un set de información etiquetada con Dataturks en el directorio data/raw/validation.
+
+```bash
+python train.py convert_dataturks_to_train_file \
+  "data/raw/validation" \
+  "PER, LOC, DIRECCIÓN" \
+  "data/unified/validation.json"
+```
+
+### Correr comandos con timer
+
+Ejecuta un comando en consola y guarda en el horario de comienzo y de fin en un log.
+
+- `command_to_run`: Es el comando a ejecutar con parametros y espacios incluido.Va entre comillas dobles
+
+```bash
+python train.py run_command_with_timer <command>
 ```
 
 **Ejemplo:**
 
 ```bash
-python train.py convert_dataturks_to_train_file \
-  "data/raw/training" \
-  "PER, LOC, DIRECCIÓN, OCUPACIÓN/PROFESIÓN, ARTÍCULO, PATENTE_DOMINIO" \
-  "data/spacy/training/training_data.json"
+python train.py run_command_with_timer "python train.py example_train_config example"
 ```
 
-#### Correr un comando con un timer:
+## Despliegue de modelo
 
-Poder correr un comando en consola y se guarda en el logger el horario de comienzo y de fin
+El script `deploy_model.sh` se encarga de:
 
-- `command_to_run`: Es el comando a ejecutar con parametros y espacios incluido.Va entre comillas dobles
+- Incluír **3 elementos al pipeline** (en orden de aparición y posterior al NER pipeline)
+- Realizar modificaciones al código fuente del modelo: se asignan Language factories para cada componente.
+- Generar un archivo `tar.gz` en el directorio `/dist`. Este bundle puede ser instalado mediante pip. Ejemplo: `pip install modelo.tar.gz`.
+
+Pipelines que se incluyen:
+
+- **EntityRuler**: `entity_ruler.py`
+- **EntityMatcher**: `entity_matcher.py`
+- **EntityCustom**: `entoty_custom.py`
+
+Parámetros:
+
+- `base_model`: directorio a un modelo base de origen, compatible con Spacy
+- `model_name`: nombre del modelo a crear, sin espacios ni guiones bajos
+- `version`: versión del modelo a crear
+- `pipeline_components`: directorio a los módulos de pipeline components que se incluiran en el modelo
 
 ```bash
-python utils.py run_command_with_timer "command_to_run"
+./deploy_model.sh <base_model> <model_name> <version> <pipeline_components>
 ```
+
+**Ejemplo:**
 
 ```bash
- python utils.py run_command_with_timer "python -m spacy train \
-   es \
-   modelos/09-12-2020-03 \
-   DatasetIntegrados/entrenamiento_circuito3.json \
-   DatasetIntegrados/validacion_circuito1.json  \
-   --pipeline=ner \
-   --n-iter=2 \
-   --base-model modelos/modelo10-12"
+./deploy_model.sh es_core_news_lg nombre-de-modelo 1.0 ./pipeline_components
 ```
 
-#### Desplegar modelo
+## Contribuciones
 
-Este script **deploy_model.sh** se encarga de:
-- Agregar **3 elementos al pipeline** (en orden y luego del NER)
-- Agregar modificaciones al código fuente del modelo agregando Language factories para cada componente
-- Generar un archivo tar.gz dentro de **/dist** (para luego instalar mediante `pip install modelo`)
-
-Pipelines agregados:
-- EntityRuler (entity_ruler.py)
-- EntityMatcher (entity_matcher.py)
-- EntityCustom (entoty_custom.py)
-
-Ejemplo de uso:
-```
-./deploy_model.sh es_core_news_lg juzgado10 1.0 ./pipeline_components
-```
-
-Parametros en orden:
-- MODELO_ORIGEN: nombre o directorio del modelo de origen
-- MODELO_NOMBRE: nombre del nuevo modelo a crear
-- MODELO_VERSION: versión del modelo a crear
-- MODELO_COMPONENTES: directorio donde estan los archivos de componentes (entity_ruler.py, entity_matcher.py, entity_custom.py)
+Por favor, asegúrese de leer los [lineamientos de contribución](CONTRIBUTING.md) antes de realizar Pull Requests.
