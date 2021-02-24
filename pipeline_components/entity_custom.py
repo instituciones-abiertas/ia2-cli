@@ -161,13 +161,13 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
             if not is_from_first_tokens(ent.start) and is_judge(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ"))
+                new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
             if not is_from_first_tokens(ent.start) and is_secretary(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="SECRETARIX"))
             if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="FISCAL"))
             if not is_from_first_tokens(ent.start) and is_ombuds_person(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="DEFENSOR"))
+                new_ents.append(Span(doc, ent.start, ent.end, label="DEFENSOR/A"))
             if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
             if not is_from_first_tokens(ent.start) and is_address(ent):
