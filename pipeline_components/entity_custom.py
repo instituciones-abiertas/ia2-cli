@@ -96,6 +96,19 @@ def is_ip_address(ent):
     is_ip = pattern.match(str(ent))
     return ent.label_ in ["NUM", "NUM_IP"] and is_ip
 
+def is_phone(ent):
+    first_token = ent[0]
+    phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico"]
+    phone_text = ["telefono", "tel", "cel"]
+    return ent.label_ == "NUM" and (
+        first_token.nbor(-1).lemma_ in phone_lemma
+        or first_token.nbor(-2).lemma_ in phone_lemma
+        or first_token.nbor(-3).lemma_ in phone_lemma
+        or first_token.nbor(-1).text in phone_text
+        or first_token.nbor(-2).text in phone_text
+        or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
+    )
+
 
 def is_address(ent):
     first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
@@ -175,6 +188,8 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
             if not is_from_first_tokens(ent.start) and is_ip_address(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
+            if not is_from_first_tokens(ent.start) and is_phone(ent):
+                new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
 
         if new_ents:
             filtered_ents = filter_spans(doc.ents, new_ents)
