@@ -1,6 +1,8 @@
 from spacy.tokens import Span
 import re 
 
+period_rules = ["año", "años", "dia", "día", "dias", "días", "mes", "meses"]
+
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
 
@@ -42,6 +44,11 @@ def is_judge(ent):
         or first_token.nbor(-2).lemma_ in judge_lemma
         or first_token.nbor(-3).lemma_ in judge_lemma
     )
+
+
+def is_period(ent):
+    first_token = ent[0]
+    return ent.label_ in ["NUM"] and first_token.nbor(1).text in period_rules
 
 def is_secretary(ent):
     first_token = ent[0]
@@ -173,6 +180,8 @@ class EntityCustom(object):
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
+            if not is_from_first_tokens(ent.start) and is_period(ent):
+                new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
             if not is_from_first_tokens(ent.start) and is_secretary(ent):
