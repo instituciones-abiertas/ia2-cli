@@ -250,6 +250,25 @@ Parámetros:
 ./deploy_model.sh es_core_news_lg nombre-de-modelo 1.0 ./pipeline_components
 ```
 
+## Tests
+
+Algunos tests utilizan un modelo de spacy para realizar pruebas sobre texto plano. Por esta razón es necesario generar un archivo *`.env`*, utilizando *`.env.example`* como base. La variable `TEST_MODEL_PATH` del achivo `.env` debe contener la ruta hacia un modelo. Luego puede utilizar el siguiente comando para correr las pruebas:
+
+```bash
+make test
+```
+
+**Ejemplos:**
+
+*`.env`*
+
+```bash
+# Un modelo entrenado y guardado dentro del directorio models/
+export TEST_MODEL_FILE=models/path_to_my_model
+# Otro ejemplo de un modelo de Spacy descargado utilizando (python -m spacy download es_core_news_lg)
+export TEST_MODEL_FILE=es_core_news_lg
+```
+
 ## Contribuciones
 
 Por favor, asegúrese de leer los [lineamientos de contribución](CONTRIBUTING.md) antes de realizar Pull Requests.

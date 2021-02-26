@@ -31,3 +31,6 @@ logs
 
 # Dist
 dist
+
+# Env
+.env
