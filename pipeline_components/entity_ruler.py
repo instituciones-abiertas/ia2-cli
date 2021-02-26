@@ -591,7 +591,16 @@ ruler_patterns = [
     {"label": "CORREO_ELECTRÓNICO", "pattern": [{"LIKE_EMAIL": True}]},
     {"label": "LEY", "pattern": [{"LOWER": "ley"}, {"LIKE_NUM": True}]},
     {"label": "NUM_CUIT_CUIL", "pattern": [{"TEXT": {"REGEX": "^(20|23|27|30|33)([0-9]{9}|-[0-9]{8}-[0-9]{1})$"}}]},
-    {"label": "NOMBRE_ARCHIVO", "pattern": [{"TEXT": {"REGEX": r"^[\w]+\.(jpg|png|gif|doc|docx|odt|txt|pdf)$"}}]},
+    {
+        "label": "NOMBRE_ARCHIVO",
+        "pattern": [
+            {
+                "TEXT": {
+                    "REGEX": r"^[\w]+\.(jpg|png|gif|bmp|tiff|svg|doc|docx|odt|txt|pdf|mp3|avi|mp4|mkv|mpg|mpeg|mov|asf|webm|3gp|3g2|m4v)$"
+                }
+            }
+        ],
+    },
     {"label": "LINK", "pattern": [{"LIKE_URL": True}]},
     {"label": "PASAPORTE", "pattern": [{"TEXT": {"REGEX": "^([a-zA-Z]{3}[0-9]{6})$"}}]},
     {"label": "CBU", "pattern": [{"ORTH": "CBU"}, {"ORTH": ":", "OP": "?"}, {"IS_DIGIT": True, "LENGTH": 22}]},
