@@ -6,17 +6,37 @@ matcher_patterns = {
 }
 
 first_left_nbors = [
-    "página", "pag", "p", "p.", "pág", "pág.", "fs", "art", "arts", "inciso",
-    "articulo", "artículo", "artículos", "articulos", "inc"
+    "página",
+    "pag",
+    "p",
+    "p.",
+    "pág",
+    "pág.",
+    "fs",
+    "art",
+    "arts",
+    "inciso",
+    "articulo",
+    "artículo",
+    "artículos",
+    "articulos",
+    "inc",
 ]
 second_left_nbors = [
-    "página", "pag", "fs", "art", "arts", "inciso", "articulo", "artículo",
-    "artículos", "articulos", "inc"
+    "página",
+    "pag",
+    "fs",
+    "art",
+    "arts",
+    "inciso",
+    "articulo",
+    "artículo",
+    "artículos",
+    "articulos",
+    "inc",
 ]
-first_right_nbors = [
-    "inc", "hs", "horas", "metros", "m", "gr", "grs", "gramos", "km", "kg",
-    "cm"
-]
+first_right_nbors = ["inc", "hs", "horas", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
+
 
 def exist_n_token(token_index, nbor_position, document_length):
     """
@@ -30,6 +50,7 @@ def exist_n_token(token_index, nbor_position, document_length):
     """
     index = token_index + nbor_position
     return index > 0 and index <= document_length
+
 
 def not_in_nbor(document_length, span, ent_name, word_list, nbor_position):
     """
@@ -49,11 +70,14 @@ def not_in_nbor(document_length, span, ent_name, word_list, nbor_position):
         and span[0].nbor(nbor_position).text not in word_list
     )
 
+
 def is_start_of_span_contained(span, target_span):
     return span.start >= target_span.start and span.start < target_span.end
 
+
 def is_end_of_span_contained(span, target_span):
     return target_span.start >= span.start and target_span.end <= span.end
+
 
 def overlaps(span, span_list):
     """
@@ -61,7 +85,7 @@ def overlaps(span, span_list):
     list.
     """
     for s in span_list:
-        if (is_start_of_span_contained(span, s) or is_end_of_span_contained(span, s)):
+        if is_start_of_span_contained(span, s) or is_end_of_span_contained(span, s):
             return True
     return False
 
@@ -71,6 +95,7 @@ class EntityMatcher(object):
     EntityMatcher: matches contexts around "NUM" entities in a Document and
     cleans them out of "NUM" labels.
     """
+
     name = "entity_matcher"
 
     def __init__(self, nlp, matcher_patterns=matcher_patterns):
@@ -88,27 +113,31 @@ class EntityMatcher(object):
             label = self.nlp.vocab.strings[match_id]
             span = Span(doc, start, end, label)
 
-            does_not_have_first_left_nbor = lambda: not_in_nbor(
-                document_length,
-                span,
-                "NUM",
-                first_left_nbors,
-                -1,
-            )
-            does_not_have_second_left_nbor = lambda: not_in_nbor(
-                document_length,
-                span,
-                "NUM",
-                second_left_nbors,
-                -2,
-            )
-            does_not_have_first_right_nbor = lambda: not_in_nbor(
-                document_length, span, "NUM", first_right_nbors, 1
-            )
+            def does_not_have_first_left_nbor():
+                return not_in_nbor(
+                    document_length,
+                    span,
+                    "NUM",
+                    first_left_nbors,
+                    -1,
+                )
 
-            if ((does_not_have_first_left_nbor() and
-                does_not_have_second_left_nbor() and
-                does_not_have_first_right_nbor()) and
-                not overlaps(span, doc.ents)):
+            def does_not_have_second_left_nbor():
+                return not_in_nbor(
+                    document_length,
+                    span,
+                    "NUM",
+                    second_left_nbors,
+                    -2,
+                )
+
+            def does_not_have_first_right_nbor():
+                return not_in_nbor(document_length, span, "NUM", first_right_nbors, 1)
+
+            if (
+                does_not_have_first_left_nbor()
+                and does_not_have_second_left_nbor()
+                and does_not_have_first_right_nbor()
+            ) and not overlaps(span, doc.ents):
                 doc.ents = list(doc.ents) + [span]
         return doc
