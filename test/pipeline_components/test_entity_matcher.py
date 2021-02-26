@@ -4,11 +4,15 @@ import unittest
 from pipeline_components.entity_matcher import (
     EntityMatcher,
     matcher_patterns,
-    first_left_nbors, second_left_nbors, first_right_nbors)
+    first_left_nbors,
+    second_left_nbors,
+    first_right_nbors,
+)
 from pipeline_components.entity_ruler import ruler_patterns
 from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.env_case import get_model_path
+
 
 class EntityMatcherTest(unittest.TestCase):
     def setUp(self):
@@ -68,6 +72,7 @@ class EntityMatcherTest(unittest.TestCase):
             self.assertEqual(a_like_num_span.text, target_span[0])
             # Asserts there is no num span in this doc entities
             self.assertNotIn(a_like_num_span, doc.ents)
+
 
 if __name__ == "__main__":
     unittest.main()

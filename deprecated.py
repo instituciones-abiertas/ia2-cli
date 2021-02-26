@@ -1,57 +1,69 @@
+import datetime
+import logging
+import spacy
+import random
+import pickle
+from os import listdir
+from os.path import isfile, join
+import srsly
+
+logger = logging.getLogger("Deprecated")
+
 """
   All functions in here are not being used. Mind that references to other functions / files may not be right.
 """
 
+
 def train_all_files_in_folder(
-  self,
-  training_files_path: str,
-  n_iter: int,
-  model_path: str,
-  entities: list,
-  best_model_path: str,
-  max_losses: float,
+    self,
+    training_files_path: str,
+    n_iter: int,
+    model_path: str,
+    entities: list,
+    best_model_path: str,
+    max_losses: float,
 ):
-  """
-  Given the path to a dataturks .json format input file directory, a list
-  of entities and a path to an existent Spacy model, trains that model for
-  `n_iter` iterations with the given entities. Whenever a best model is
-  found it is writen to disk at the given output path.
-  
-  :param training_files_path: A string representing the path to the input
-  files directory.
-  :param n_iter: An integer representing a number of iterations.
-  :param model_path: A string representing the path to the model to train.
-  :param entities: A list of string representing the entities to consider
-  during training.
-  :param best_model_path: A string representing the path to write the best
-  trained model.
-  :param max_losses: A float representing the maximum NER losses value
-  to consider before start writing best models output.
-  """
-  
-  begin_time = datetime.datetime.now()
-  onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
-  random.shuffle(onlyfiles)
-  self.add_new_entity_to_model(entities, model_path)
-  best_losses = max_losses
-  processed_docs = 0
-  for file_name in onlyfiles:
-    logger.info(f"Started processing file at \"{file_name}\"...")
-    best_losses = self.train_model(
-      training_files_path + file_name,
-      n_iter,
-      model_path,
-      entities,
-      best_model_path,
-      best_losses,
-    )
-    processed_docs = processed_docs + 1
-    print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
-    logger.info(f"Maximum considerable losses is \"{best_losses}\".")
-    logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
-  
-  diff = datetime.datetime.now() - begin_time
-  logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
+    """
+    Given the path to a dataturks .json format input file directory, a list
+    of entities and a path to an existent Spacy model, trains that model for
+    `n_iter` iterations with the given entities. Whenever a best model is
+    found it is writen to disk at the given output path.
+
+    :param training_files_path: A string representing the path to the input
+    files directory.
+    :param n_iter: An integer representing a number of iterations.
+    :param model_path: A string representing the path to the model to train.
+    :param entities: A list of string representing the entities to consider
+    during training.
+    :param best_model_path: A string representing the path to write the best
+    trained model.
+    :param max_losses: A float representing the maximum NER losses value
+    to consider before start writing best models output.
+    """
+
+    begin_time = datetime.datetime.now()
+    onlyfiles = [f for f in listdir(training_files_path) if isfile(join(training_files_path, f))]
+    random.shuffle(onlyfiles)
+    self.add_new_entity_to_model(entities, model_path)
+    best_losses = max_losses
+    processed_docs = 0
+    for file_name in onlyfiles:
+        logger.info(f'Started processing file at "{file_name}"...')
+        best_losses = self.train_model(
+            training_files_path + file_name,
+            n_iter,
+            model_path,
+            entities,
+            best_model_path,
+            best_losses,
+        )
+        processed_docs = processed_docs + 1
+        print(f"Processed {processed_docs} out of {len(onlyfiles)} documents.")
+        logger.info(f'Maximum considerable losses is "{best_losses}".')
+        logger.info((f"Processed {processed_docs} out of {len(onlyfiles)} documents."))
+
+    diff = datetime.datetime.now() - begin_time
+    logger.info(f"Lasted {diff} to process {len(onlyfiles)} documents.")
 
 
 def convert_dataturks_to_training_cli(self, input_files_path: str, entities: list, output_file_path: str):
@@ -112,6 +124,9 @@ def convert_dataturks_to_training_cli(self, input_files_path: str, entities: lis
     diff = datetime.datetime.now() - begin_time
     logger.info(f"Finished Converting {len(TRAIN_DATA)} Spacy Documents into trainable data. Lasted: {diff}")
 
+    def docs_to_json(doc):
+        return doc
+
     try:
         logger.info(f'💾 Writing final output at "{output_file_path}"...')
         srsly.write_json(output_file_path, [docs_to_json(docs)])
@@ -140,26 +155,27 @@ def convert_dataturks_to_spacy(self, input_file_path: str, output_file_path: str
         pickle.dump(training_data, output, pickle.HIGHEST_PROTOCOL)
     logger.info(f'Succesfully converted data at "{output_file_path}".')
 
-def count_examples(self, files_path: str, entities: list):
-  """
-  Given the path to a dataturks .json format input file directory and a
-  list of entities, prints the total number of examples by label.
 
-  :param files_path: Directory pointing to dataturks .json files to
-  be converted.
-  :param entities: A list of entities, separated by comma, to be
-  considered in the final output.
-  """
-  entities = entities.split(",")
-  input_files_dir_path = files_path
-  onlyfiles = [f for f in listdir(input_files_dir_path) if isfile(join(input_files_dir_path, f))]
-  all_entities = {}
-  for entity in entities:
-      entity_length = 0
-      for file_ in onlyfiles:
-          validation_data = convert_dataturks_to_spacy(input_files_dir_path + file_, [entity])
-          for _, annotations in validation_data:
-              occurences = annotations.get("entities")
-              entity_length = entity_length + len(occurences)
-      all_entities[entity] = entity_length
-  logger.info(f"Total entities output: {all_entities}")
+def count_examples(self, files_path: str, entities: list):
+    """
+    Given the path to a dataturks .json format input file directory and a
+    list of entities, prints the total number of examples by label.
+
+    :param files_path: Directory pointing to dataturks .json files to
+    be converted.
+    :param entities: A list of entities, separated by comma, to be
+    considered in the final output.
+    """
+    entities = entities.split(",")
+    input_files_dir_path = files_path
+    onlyfiles = [f for f in listdir(input_files_dir_path) if isfile(join(input_files_dir_path, f))]
+    all_entities = {}
+    for entity in entities:
+        entity_length = 0
+        for file_ in onlyfiles:
+            validation_data = convert_dataturks_to_spacy(input_files_dir_path + file_, [entity])
+            for _, annotations in validation_data:
+                occurences = annotations.get("entities")
+                entity_length = entity_length + len(occurences)
+        all_entities[entity] = entity_length
+    logger.info(f"Total entities output: {all_entities}")

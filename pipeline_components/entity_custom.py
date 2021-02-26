@@ -1,5 +1,6 @@
 from spacy.tokens import Span
-import re 
+import re
+
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -43,12 +44,22 @@ def is_judge(ent):
         or first_token.nbor(-3).lemma_ in judge_lemma
     )
 
+
 def is_secretary(ent):
     first_token = ent[0]
-    secretarix_lemma = ["secretario", "secretaria", "prosecretario", "prosecretaria", "Prosecretario", "Prosecretaria", "Secretario", "Secretaria"]
+    secretarix_lemma = [
+        "secretario",
+        "secretaria",
+        "prosecretario",
+        "prosecretaria",
+        "Prosecretario",
+        "Prosecretaria",
+        "Secretario",
+        "Secretaria",
+    ]
     return ent.label_ in ["PER", "LOC"] and (
-        first_token.nbor(-1).lemma_ in secretarix_lemma 
-        or first_token.nbor(-2).lemma_ in secretarix_lemma 
+        first_token.nbor(-1).lemma_ in secretarix_lemma
+        or first_token.nbor(-2).lemma_ in secretarix_lemma
         or first_token.nbor(-3).lemma_ in secretarix_lemma
     )
 
@@ -62,6 +73,7 @@ def is_prosecutor(ent):
         or first_token.nbor(-3).lemma_ in prosecutor_lemma
     )
 
+
 def is_ombuds_person(ent):
     first_token = ent[0]
     ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
@@ -71,14 +83,29 @@ def is_ombuds_person(ent):
         or first_token.nbor(-3).lemma_ in ombuds_person_lemma
     )
 
+
 def is_accused(ent):
     first_token = ent[0]
-    accused_lemma = ["acusado", "acusada", "imputado", "imputada", "infractor", "infractora", "Acusado", "Acusada", "Imputado", "Imputada", "Infractor", "Infractora"]
+    accused_lemma = [
+        "acusado",
+        "acusada",
+        "imputado",
+        "imputada",
+        "infractor",
+        "infractora",
+        "Acusado",
+        "Acusada",
+        "Imputado",
+        "Imputada",
+        "Infractor",
+        "Infractora",
+    ]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in accused_lemma
         or first_token.nbor(-2).lemma_ in accused_lemma
         or first_token.nbor(-3).lemma_ in accused_lemma
     )
+
 
 def is_advisor(ent):
     first_token = ent[0]
@@ -89,12 +116,13 @@ def is_advisor(ent):
         or first_token.nbor(-3).lemma_ in advisor_lemma
     )
 
+
 def is_ip_address(ent):
-    first_token = ent[0]
-    octet_rx = r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)'
+    octet_rx = r"(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
     pattern = re.compile(r"^{0}(?:\.{0}){{3}}$".format(octet_rx))
     is_ip = pattern.match(str(ent))
     return ent.label_ in ["NUM", "NUM_IP"] and is_ip
+
 
 def is_phone(ent):
     first_token = ent[0]

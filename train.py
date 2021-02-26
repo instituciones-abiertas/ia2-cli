@@ -44,6 +44,7 @@ formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(me
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
+
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
         training_data = []
@@ -96,6 +97,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     except Exception as e:
         logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
+
 
 class SpacyUtils:
     """
@@ -217,13 +219,22 @@ class SpacyUtils:
         except Exception:
             logging.exception(f'An error occured writing the output file at "{output_file_path}".')
 
-
     # =================================
     # Model Training functions
     # =================================
 
     def get_best_model(
-        self, optimizer, nlp, n_iter, training_data, path_best_model, validation_data=[], testing_data=[], callbacks={}, settings={}, disabled_pipes=[]
+        self,
+        optimizer,
+        nlp,
+        n_iter,
+        training_data,
+        path_best_model,
+        validation_data=[],
+        testing_data=[],
+        callbacks={},
+        settings={},
+        disabled_pipes=[],
     ):
         init_time = time.time()
         print("\nsettings", settings)
@@ -245,7 +256,7 @@ class SpacyUtils:
                 "lr": [],
                 "batches": [],  # processed batches
                 "dropout": [],
-                "saved": []
+                "saved": [],
             },
             "min_ner": 0,
             "max_f_score": 0,
@@ -258,15 +269,15 @@ class SpacyUtils:
             "dropout": settings["dropout"],
             "elapsed_time": 0,
             "stop": False,
-            "evaluate_test": False
+            "evaluate_test": False,
         }
 
         # for validation. activate if exists validation data
         if settings["evaluate"] == "val":
             val_texts, val_annotations = zip(*validation_data)
-        
+
         if len(testing_data) > 0:
-            test_texts, test_annotations = zip(*testing_data)    
+            test_texts, test_annotations = zip(*testing_data)
 
         tr_texts, tr_annotations = zip(*training_data)
 
@@ -274,7 +285,7 @@ class SpacyUtils:
             # Randomizes training data
             random.shuffle(training_data)
             losses = {}
-                    
+
             # set/update Adam optimizer from state
             optimizer.learn_rate = state["lr"]
 
@@ -286,12 +297,12 @@ class SpacyUtils:
             # Creates mini batches
             batches = minibatch(training_data, size=batch_size)
             num_batches = 0
-            #bz = []
+            # bz = []
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
 
-                #bz.append(len(texts))
+                # bz.append(len(texts))
                 nlp.update(
                     texts,  # batch of raw texts
                     annotations,  # batch of annotations
@@ -311,7 +322,7 @@ class SpacyUtils:
                     val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
                         optimizer, nlp, val_texts, val_annotations
                     )
-                
+
                 # train data score
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
                     optimizer, nlp, tr_texts, tr_annotations
@@ -346,17 +357,17 @@ class SpacyUtils:
             # compute testing dataset scores
             # Since we can save many models if some threshold has been reached
             # during the train loop. We also want to get scores on test data
-            # for each one of this models.         
+            # for each one of this models.
             if settings["evaluate"] == "test" and state["evaluate_test"]:
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
                     optimizer, nlp, test_texts, test_annotations
                 )
                 logger.info("############################################################")
-                logger.info(f"Evaluating saved model with test data")
+                logger.info("Evaluating saved model with test data")
                 logger.info(f"Scores :f1-score: {test_f_score}, precision: {test_precision_score}")
                 logger.info(f"{test_per_type_score}")
                 logger.info("############################################################")
-                
+
             state["evaluate_test"] = False
             state["i"] += 1
 
@@ -391,14 +402,15 @@ class SpacyUtils:
             # GPU
             # if GPU enabled
 
-            if "use_gpu" in train_config and train_config["use_gpu"] == True:
+            if "use_gpu" in train_config and train_config["use_gpu"] is True:
                 try:
                     import cupy
+
                     spacy.prefer_gpu()
                     logger.info("Using GPU 🎮")
-                except:
-                    logger.warning("❗ Either GPU not available or CUDA versions is not compatible")    
-            
+                except Exception as e:
+                    logger.warning("❗ Either GPU not available or CUDA versions is not compatible: %s", str(e))
+
             # test dataset
             evaluate = "val"
             if "evaluate" in train_config and train_config["evaluate"] == "test":
@@ -407,7 +419,7 @@ class SpacyUtils:
             test_ds = ""
             if "path_data_testing" in train_config:
                 test_ds = train_config["path_data_testing"]
-            
+
             # train settings
             dropout = utils.set_dropout(train_config, FUNC_MAP)
             batch_size, batch_args = utils.set_batch_size(train_config, FUNC_MAP)
@@ -416,14 +428,14 @@ class SpacyUtils:
             optimizer = {}
             if "optimizer" in train_config:
                 optimizer = train_config["optimizer"]
-                       
+
             s = {
                 "dropout": dropout,
                 "optimizer": optimizer,
                 # "dropout_args": dropout_args,
                 "batch_size": batch_size,
                 "batch_args": batch_args,
-                "evaluate": evaluate
+                "evaluate": evaluate,
             }
 
             on_iter_cb = []
@@ -450,8 +462,8 @@ class SpacyUtils:
             train_config["epochs"],
             train_config["model_path"],
             train_config["entities"],
-            "", # prefered save_best_model callback
-            0, # prefered save_best_model callback
+            "",  # prefered save_best_model callback
+            0,  # prefered save_best_model callback
             train_config["is_raw"],
             train_config["path_data_validation"],
             path_data_testing=test_ds,
@@ -501,7 +513,7 @@ class SpacyUtils:
             if path_data_validation != "":
                 logger.info(f"loading and converting validation data from dataturks: {path_data_training}")
                 validation_data = convert_dataturks_to_spacy(path_data_training, ents)
-               
+
             if path_data_testing != "":
                 logger.info(f"loading and converting testing data from dataturks: {path_data_training}")
                 testing_data = convert_dataturks_to_spacy(path_data_testing, ents)
@@ -520,17 +532,17 @@ class SpacyUtils:
                 with open(path_data_testing) as f:
                     testing_data = json.load(f)
                 # mix train and validation data
-                training_data += validation_data  
+                training_data += validation_data
             else:
                 testing_data = []
 
-        #print("total data: ", len(training_data))    
+        # print("total data: ", len(training_data))
 
         nlp = spacy.load(model_path)
         # Filters pipes to disable them during training
         pipe_exceptions = ["ner"]
         other_pipes = [pipe for pipe in nlp.pipe_names if pipe not in pipe_exceptions]
-        
+
         # Creates a ner pipe if it does not exist.
         if "ner" not in nlp.pipe_names:
             component = nlp.create_pipe("ner")
@@ -542,8 +554,8 @@ class SpacyUtils:
                 ner.add_label(ent[2])
         # Save disable pipelines for further restoring
         disabled_pipes = nlp.disable_pipes(*other_pipes)
-        
-        with warnings.catch_warnings():            
+
+        with warnings.catch_warnings():
             # Show warnings for misaligned entity spans once
             warnings.filterwarnings("once", category=UserWarning, module="spacy")
 
@@ -552,7 +564,7 @@ class SpacyUtils:
             optimizer = nlp.begin_training(component_cfg={"ner": {"conv_window": 3, "hidden_width": 64}})
 
             # this initial save remove the pipelines from base model and is not restoring them
-            # 
+            #
             #
             # we save the first model and then we update it if there is a better version of it
             # logger.info(f"💾 Saving initial model")
@@ -579,7 +591,6 @@ class SpacyUtils:
                 training_data = random.sample(training_data, train_subset)
                 logger.info(f"Using a random subset of {train_subset} texts")
 
-
             self.get_best_model(
                 optimizer,
                 nlp,
@@ -590,9 +601,8 @@ class SpacyUtils:
                 testing_data=testing_data,
                 callbacks=callbacks,
                 settings=settings,
-                disabled_pipes=disabled_pipes
+                disabled_pipes=disabled_pipes,
             )
-
 
     # =================================
     # Evaluation and display functions
@@ -636,7 +646,6 @@ class SpacyUtils:
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
-        per_type_sum = 0
         ents_per_type_sum = {}
         for idx in range(len(texts)):
             text = texts[idx]
@@ -710,7 +719,7 @@ class SpacyUtils:
             orig = os.path.join(model_components, f)
             shutil.copyfile(orig, dest)
 
-# NOTE indentation in this string leads to model error
+        # NOTE indentation in this string leads to model error
         new_code = f"""import os
 import importlib
 from spacy.language import Language
@@ -720,11 +729,11 @@ def import_path(path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-    
+
 dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
-    
+
 Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
 Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
 """
@@ -739,6 +748,7 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                 content.insert(insert_line, c + "\n")
             f.writelines(content)
         logger.info("Succesfully write language factories to model")
+
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
