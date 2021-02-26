@@ -88,25 +88,27 @@ class EntityMatcher(object):
             label = self.nlp.vocab.strings[match_id]
             span = Span(doc, start, end, label)
 
-            has_first_left_nbor = lambda: not_in_nbor(
+            does_not_have_first_left_nbor = lambda: not_in_nbor(
                 document_length,
                 span,
                 "NUM",
                 first_left_nbors,
                 -1,
             )
-            has_second_left_nbor = lambda: not_in_nbor(
+            does_not_have_second_left_nbor = lambda: not_in_nbor(
                 document_length,
                 span,
                 "NUM",
                 second_left_nbors,
                 -2,
             )
-            has_first_right_nbor = lambda: not_in_nbor(
+            does_not_have_first_right_nbor = lambda: not_in_nbor(
                 document_length, span, "NUM", first_right_nbors, 1
             )
 
-            if (has_first_left_nbor() and has_second_left_nbor() and
-                has_first_right_nbor()) and not overlaps(span, doc.ents):
+            if ((does_not_have_first_left_nbor() and
+                does_not_have_second_left_nbor() and
+                does_not_have_first_right_nbor()) and
+                not overlaps(span, doc.ents)):
                 doc.ents = list(doc.ents) + [span]
         return doc
