@@ -1,27 +1,17 @@
-import spacy
 import unittest
 
 from pipeline_components.entity_matcher import (
-    EntityMatcher,
-    matcher_patterns,
     first_left_nbors,
     second_left_nbors,
     first_right_nbors,
 )
-from pipeline_components.entity_ruler import ruler_patterns
-from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
-from test.support.env_case import get_model_path
+from test.support.env_case import setup_model
 
 
 class EntityMatcherTest(unittest.TestCase):
     def setUp(self):
-        self.nlp = spacy.load(get_model_path())
-        ruler = EntityRuler(self.nlp, overwrite_ents=True)
-        ruler.add_patterns(ruler_patterns)
-        self.nlp.add_pipe(ruler)
-        entity_matcher = EntityMatcher(self.nlp, matcher_patterns)
-        self.nlp.add_pipe(entity_matcher)
+        self.nlp = setup_model()
 
     def test_an_entity_matcher_does_not_clean_num_entities_when_no_nbors_match(self):
         target_span = ("veinte", 6, 7)
