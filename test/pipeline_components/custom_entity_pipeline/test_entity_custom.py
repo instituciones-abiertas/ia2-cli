@@ -5,11 +5,15 @@ from pipeline_components.entity_custom import EntityCustom, period_rules
 from pipeline_components.entity_matcher import (
     EntityMatcher,
     matcher_patterns,
-    first_left_nbors, second_left_nbors, first_right_nbors)
+    first_left_nbors,
+    second_left_nbors,
+    first_right_nbors,
+)
 from pipeline_components.entity_ruler import ruler_patterns
 from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.env_case import get_model_path
+
 
 class EntityCustomTest(unittest.TestCase):
     def setUp(self):
@@ -24,13 +28,32 @@ class EntityCustomTest(unittest.TestCase):
         entity_custom = EntityCustom(self.nlp)
         self.nlp.add_pipe(entity_custom)
 
-
     def test_a_custom_entity_pipeline_detects_periods(self):
         base_test_senteces = [
-            ("seis",       11, 12, "Si se tratare de un instrumento público y con prisión de seis {}, si se tratare de un instrumento privado"),
-            ("6",          11, 12, "Si se tratare de un instrumento público y con prisión de 6 {}, si se tratare de un instrumento privado"),
-            ("67985",      11, 12, "Si se tratare de un instrumento público y con prisión de 67985 {}, si se tratare de un instrumento privado"),
-            ("veintitrés", 11, 12, "Si se tratare de un instrumento público y con prisión de veintitrés {}, si se tratare de un instrumento privado")
+            (
+                "seis",
+                11,
+                12,
+                "Si se tratare de un instrumento público y con prisión de seis {}, si se tratare de un instrumento privado",
+            ),
+            (
+                "6",
+                11,
+                12,
+                "Si se tratare de un instrumento público y con prisión de 6 {}, si se tratare de un instrumento privado",
+            ),
+            (
+                "67985",
+                11,
+                12,
+                "Si se tratare de un instrumento público y con prisión de 67985 {}, si se tratare de un instrumento privado",
+            ),
+            (
+                "veintitrés",
+                11,
+                12,
+                "Si se tratare de un instrumento público y con prisión de veintitrés {}, si se tratare de un instrumento privado",
+            ),
         ]
         for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
             for nbor_word in period_rules:
@@ -43,6 +66,7 @@ class EntityCustomTest(unittest.TestCase):
                 self.assertEqual(a_like_num_span.text, expected_period)
                 # Asserts a PERIODO like span exists in the document entities
                 self.assertIn(a_like_num_span, doc.ents)
+
 
 if __name__ == "__main__":
     unittest.main()
