@@ -2,7 +2,24 @@ from spacy.tokens import Span
 import re
 
 
-period_rules = ["año", "años", "dia", "día", "dias", "días", "mes", "meses"]
+period_rules = [
+    "segundo",
+    "segundos",
+    "minuto",
+    "minutos",
+    "hr",
+    "hs",
+    "hora",
+    "horas",
+    "año",
+    "años",
+    "dia",
+    "día",
+    "dias",
+    "días",
+    "mes",
+    "meses",
+]
 
 
 def is_age(token, right_token, token_sent):
