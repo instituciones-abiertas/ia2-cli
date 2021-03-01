@@ -45,5 +45,6 @@ A la información detectada mediante el aprendizaje automático del modelo, se a
 |NUM_TELÉFONO|números de teléfono|el llamado se realizó desde el **4123-4123**|[Formatos soportados](pipeline_components/entity_ruler.py#L367)| |
 |PASAPORTE|número de pasaporte argentino|Maria Gonzalez, pasaporte nro **ABC123456** | [Formato soportado](pipeline_components/entity_ruler.py#L596)| |
 |PATENTE_DOMINIO|patente de vehículo|el imputado manejaba un vehículo marca volkswagen con patente **FHG-456**|[Formatos soportados](pipeline_components/entity_ruler.py#L330)| |
+|PERIODO|período de tiempo|con prisión de **seis años**, si se tratare de un instrumento privado|[Formatos soportados](pipeline_components/entity_custom.py#L5)| Entity Custom |
 |SECRETARIX|nombre de secretario/secretaria nombradx en la causa|Secretaria: **María Gonzalez**| *Secretario* antes de identificación como *PER* | |
 |USUARIX|del usuario "juan21" de red social|Usuarios de web o redes sociales|Soporta patrón *del usuario "nombredelusuario"* | |
