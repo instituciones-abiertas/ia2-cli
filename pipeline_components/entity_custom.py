@@ -139,7 +139,54 @@ def is_phone(ent):
 
 
 def is_address(ent):
-    first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
+    # FIXME "hasta" estaba dentro de first_left_nbors
+    # FIXME considerar unificar las listas first_left_nbors y second_left_nbors
+    # FIXME si no se unifican, deberían quedar consumibles de otra manera
+    first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
+                        "avenida", "av.", "Avenida", "Av.", "pasaje", "Pasaje"]
+    second_left_nbors = [
+        "instalación", "contramano", "sita", "sitas", "sito", "sitos",
+        "real", "domiciliado", "domiciliada", "constituido",
+        "constituida", "contramano", "intersección", "domicilio",
+        "ubicado", "registrado", "ubicada", "real"
+    ]
+    first_token = ent[0]
+    last_token = ent[-1]
+    is_address_1_tokens_to_left = first_token.nbor(-1).lower_ in first_left_nbors
+    is_address_2_tokens_to_left = first_token.nbor(-2).lower_ in second_left_nbors
+    try:
+        is_address_3_tokens_to_left = first_token.nbor(-3).lower_ in first_left_nbors
+    except:
+        is_address_3_tokens_to_left = False
+    try:
+        is_address_4_tokens_to_left = first_token.nbor(-4).lower_ in first_left_nbors
+    except:
+        is_address_4_tokens_to_left = False
+
+    is_address = ent.label_ in ["NUM"] and (
+        is_address_1_tokens_to_left
+        or is_address_2_tokens_to_left
+        or first_token.nbor(-2).lower_ in first_left_nbors
+        or is_address_3_tokens_to_left
+        or is_address_4_tokens_to_left
+    )
+#    if is_address:
+#    print(f"ent: {ent}   ent.label_: {ent.label_}")
+#    print(f"first_token.nbor(-1) {first_token.nbor(-1).lower_}")
+#    print(f"first_token.nbor(-2) {first_token.nbor(-2).lower_}")
+#      print(f"first_token.nbor(-3) {first_token.nbor(-3).lower_}")
+#      print(f"first_token.nbor(-4) {first_token.nbor(-4).lower_}")
+    return (ent.label_ in ["PER"] and (
+        is_address_1_tokens_to_left
+        or is_address_2_tokens_to_left
+        or last_token.like_num
+        or last_token.nbor().like_num
+    ) or is_address)
+
+
+def get_aditional_tokens_for_address(ent):
+    first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
+                        "avenida", "av.", "Avenida", "Av.", "pasaje", "Pasaje"]
     second_left_nbors = [
         "instalación",
         "contramano",
@@ -156,18 +203,48 @@ def is_address(ent):
         "intersección",
         "domicilio",
         "ubicado",
+        "registrado",
         "ubicada",
         "real",
     ]
-    first_token = ent[0]
-    last_token = ent[-1]
+    if ent.label_ in ["NUM"]:
+        token = ent[0]
+        if token.nbor(-1).lower_ in first_left_nbors:
+            return 1
+        if token.nbor(-2).lower_ in second_left_nbors or token.nbor(-2).lower_ in first_left_nbors:
+            return 2
+        if token.nbor(-3).lower_ in first_left_nbors:
+            return 3
+        if token.nbor(-4).lower_ in first_left_nbors:
+            return 4
+    return 0
 
-    return ent.label_ in ["PER"] and (
-        first_token.nbor(-1).lower_ in first_left_nbors
-        or first_token.nbor(-2).lower_ in second_left_nbors
-        or last_token.like_num
-        or last_token.nbor().like_num
-    )
+
+#def is_numeric_address(ent):
+#    left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta", "domicilio", "Domicilio"]
+#    nro_nbors = ["nro", "numero", "número"]
+#    # TODO considerar agregar "nro", "número" como left_nbors y armar una sola etiqueta DIRECCION
+#
+#    token = ent[0]
+##    if ent.label_ == "NUM":
+##      print(f"ent {ent}")
+##      print(f"ent.label_ {ent.label_}")
+##      print(f"ent.text {ent.text}")
+##      print(f"token.nbor(-1) {token.nbor(-1).lower_}")
+##      print(f"token.nbor(-2) {token.nbor(-2).lower_}")
+#    is_number_of_address = False
+#    try:
+#        #      print(f"token.nbor(-3) {token.nbor(-3).lower_}")
+#        #      print(f"token.nbor(-4) {token.nbor(-4).lower_}")
+#        is_number_of_address = (token.nbor(-1).lower_ in nro_nbors or token.nbor(-2).lower_ in nro_nbors) and (
+#            token.nbor(-3).lower_ in left_nbors or token.nbor(-4).lower_ in left_nbors)
+##      print(f"is_number_of_address: {is_number_of_address}")
+#    except:
+#        print("\n")
+#
+#    return ent.label_ in ["NUM"] and ((
+#        token.nbor(-1).lower_ in left_nbors
+#    ) or is_number_of_address)
 
 
 def filter_spans(a_list, b_list):
@@ -211,9 +288,40 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="DEFENSOR/A"))
             if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
+
             if not is_from_first_tokens(ent.start) and is_address(ent):
                 token_adicional = 1 if ent[-1].nbor().like_num else 0
-                new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+                address_token = get_aditional_tokens_for_address(ent)
+                print(f"ent: {ent} - address_token {address_token}")
+                if address_token > 1:
+                  new_ent_start = ent.start - address_token + 1
+                  #filtered = [new_ent for new_ent in new_ents if new_ent_start >= new_ent.start and new_ent_start <= new_ent.end or ent.end >= new_ent.start and ent.end <= new_ent.end]
+
+                  span_to_remove_index = None
+                  for i, new_ent in enumerate(new_ents):
+                    if new_ent_start >= new_ent.start and new_ent_start <= new_ent.end or ent.end >= new_ent.start and ent.end <= new_ent.end:
+                      span_to_remove_index = i
+                      break
+
+                  if span_to_remove_index:
+                    print(f"ANTES new_ents {new_ents}")
+                    filtered = new_ents.pop(span_to_remove_index)
+                    print(f"DESP POP new_ents {new_ents}")
+                    #print(f"ent.end - new_ent_start = {ent.end - new_ent_start}")
+                    #print(f"filtered.end - filtered.start = {filtered.end - filtered.start}")
+                    if (ent.end - new_ent_start) > (filtered.end - filtered.start):
+                      new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
+                    else:
+                      new_ents.append(filtered)
+                    #print(f"DESPUES new_ents {new_ents}")
+                  else:
+                    new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
+                    print(f"DESPUES new_ents {new_ents}")
+                else:
+                  new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+                
+            #if not is_from_first_tokens(ent.start) and is_numeric_address(ent):
+            #    new_ents.append(Span(doc, ent.start - 1, ent.end, label="DIRECCIÓN"))                
             if not is_from_first_tokens(ent.start) and is_ip_address(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
             if not is_from_first_tokens(ent.start) and is_phone(ent):
