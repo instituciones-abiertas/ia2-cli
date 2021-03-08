@@ -170,6 +170,24 @@ def is_address(ent):
     )
 
 
+def is_license_plate(ent):
+  print(f"ent {ent}")
+  token = ent[0]
+  first_left_token = token.nbor(-1).lower_
+  second_left_token = token.nbor(-2).lower_
+  third_left_token = token.nbor(-3).lower_
+  license_texts = ["patente", "dominio"]
+  dont_consider = "bis"
+  #FIXME deberíamos anonimizar el número y lo que está antes (revisar los patrones que identificamos)
+  
+  #TODO si es un articulo que encaja con la regla de patente, hay que eliminar el SPAN
+  is_not_an_article = ent.label_ == "PATENTE_DOMINIO" and token.lower_.find(dont_consider) != -1
+  print(f"token.lower_ {token.lower_}")
+  if ent.label_ == "PATENTE_DOMINIO":
+    print(f"token: {token}  -  is_not_an_article {is_not_an_article}")  
+  return (token.like_num and (first_left_token in license_texts or second_left_token in license_texts or third_left_token in license_texts) or is_not_an_article)
+
+
 def filter_spans(a_list, b_list):
     # filtra spans de a_list que se overlapeen con algun span de b_list
     def overlap(span, span_list):
@@ -218,6 +236,8 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
             if not is_from_first_tokens(ent.start) and is_phone(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
+            if not is_from_first_tokens(token.i) and is_license_plate(ent):
+                new_ents.append(Span(doc, ent.start, ent.end, label="PATENTE_DOMINIO"))
 
         if new_ents:
             filtered_ents = filter_spans(doc.ents, new_ents)
