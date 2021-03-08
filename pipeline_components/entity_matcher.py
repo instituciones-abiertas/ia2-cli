@@ -35,7 +35,7 @@ second_left_nbors = [
     "articulos",
     "inc",
 ]
-first_right_nbors = ["inc", "hs", "horas", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
+first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
 
 
 def exist_n_token(token_index, nbor_position, document_length):
