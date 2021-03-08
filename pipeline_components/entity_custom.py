@@ -27,6 +27,11 @@ def is_expedienteNumber(token):
     ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
 
 
+def is_law(token, first_left_token, second_left_token, third_left_token):
+  law_texts = ["ley", "leyes"]
+  return token.like_num and (first_left_token.lower_ in law_texts or second_left_token.lower_ in law_texts or third_left_token.lower_ in law_texts)
+
+
 def is_last(token_id, doc):
     return token_id == len(doc) - 1
 
@@ -200,6 +205,8 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
+            if not is_from_first_tokens(token.i) and is_law(token, token.nbor(-1), token.nbor(-2), token.nbor(-3)):
+                new_ents.append(Span(doc, token.i, token.i + 1, label="LEY"))
         for ent in doc.ents:
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
