@@ -3,11 +3,32 @@ from spacy.tokens import Span
 from spacy.lang.es.lex_attrs import _num_words
 from spacy.util import filter_spans
 
+# Extends built-in lex_attrs from the spanish lang package
 num_words = _num_words + [
-    "quinientos",
+    "ciento",
+    "docientas",
+    "docientos",
+    "doscientas",
+    "doscientos",
+    "trecientas",
+    "trecientos",
+    "trescientas",
+    "trescientos",
+    "cuatrocientas",
+    "cuatrocientos",
     "quinientas",
-    "ochocientos",
+    "quinientos",
+    "seiscientas",
+    "seiscientos",
+    "setecientas",
+    "setecientos",
     "ochocientas",
+    "ochocientos",
+    "novecientas",
+    "novecientos",
+    "millones",
+    "billones",
+    "trillones",
 ]
 
 first_left_nbors = [
@@ -70,10 +91,7 @@ def not_in_nbor(document_length, span, ent_name, word_list, nbor_position):
     left (negative values) or to the right (positive values)
     """
     if exist_n_token(span[0].i, nbor_position, document_length):
-        return (
-            span.label_ == ent_name
-            and span[0].nbor(nbor_position).text not in word_list
-        )
+        return span.label_ == ent_name and span[0].nbor(nbor_position).text not in word_list
     return True
 
 
@@ -98,22 +116,29 @@ def overlaps(span, span_list):
 
 matcher_patterns = [
     # Multi-num tokens
-    [
-        {"LOWER": {"IN": num_words}, "OP": "+"},
-        {"ORTH": 'y', "OP": "*"},
-        {"LOWER": {"IN": num_words}, "OP": "+"}
-    ],
+    (
+        "NUM",
+        [
+            {"LOWER": {"IN": num_words}, "OP": "+"},
+            {"ORTH": "y", "OP": "*"},
+            {"LOWER": {"IN": num_words}, "OP": "+"},
+            {"ORTH": "y", "OP": "*"},
+            {"LOWER": {"IN": num_words}, "OP": "+"},
+            {"ORTH": "y", "OP": "*"},
+            {"LOWER": {"IN": num_words}, "OP": "+"},
+        ],
+    ),
     # Single num tokens
-    [{"LOWER": {"IN": num_words}, "OP": "+"}],
+    ("NUM", [{"LOWER": {"IN": num_words}, "OP": "+"}]),
     # Digit-like words
-    [{"IS_DIGIT": True}],
+    ("NUM", [{"IS_DIGIT": True}]),
 ]
 
 
 class EntityMatcher(object):
     """
-    EntityMatcher: matches contexts around "NUM" entities in a Document and
-    cleans them out of "NUM" labels.
+    EntityMatcher: Detects and labels "NUM" entities. Matches their context to
+    clean out nums that should be labeled as another entity.
     """
 
     name = "entity_matcher"
@@ -122,8 +147,8 @@ class EntityMatcher(object):
         self.nlp = nlp
         self.matcher = Matcher(self.nlp.vocab, validate=True)
         # Adds patterns to the Matcher pipeline
-        for pattern in matcher_patterns:
-            self.matcher.add("NUM", [pattern], on_match=None)
+        for entity_label, pattern in matcher_patterns:
+            self.matcher.add(entity_label, [pattern], on_match=None)
 
     def __call__(self, doc):
         matches = self.matcher(doc)
