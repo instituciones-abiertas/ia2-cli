@@ -21,6 +21,11 @@ period_rules = [
     "meses",
 ]
 
+law_left_nbors = [
+    "ley",
+    "leyes",
+]
+
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -48,12 +53,11 @@ def is_expedienteNumber(token):
 
 
 def is_law(ent, doc):
-    law_texts = ["ley", "leyes"]
     first_token = ent[0]
     return ent.label_ == "NUM" and (
-        first_token.nbor(-1).lower_ in law_texts
-        or first_token.nbor(-2).lower_ in law_texts
-        or first_token.nbor(-3).lower_ in law_texts
+        first_token.nbor(-1).lower_ in law_left_nbors
+        or first_token.nbor(-2).lower_ in law_left_nbors
+        or first_token.nbor(-3).lower_ in law_left_nbors
     )
 
 
