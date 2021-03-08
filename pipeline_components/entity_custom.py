@@ -1,6 +1,6 @@
 from spacy.tokens import Span
+from spacy.util import filter_spans
 import re
-
 
 period_rules = [
     "segundo",
@@ -65,9 +65,9 @@ def is_judge(ent):
     )
 
 
-def is_period(ent):
-    first_token = ent[0]
-    return ent.label_ in ["NUM"] and first_token.nbor(1).text in period_rules
+def is_period(ent, doc):
+    last_token = ent[len(ent) - 1]
+    return ent.label_ in ["NUM"] and last_token.nbor(1).text in period_rules
 
 
 def is_secretary(ent):
@@ -195,17 +195,6 @@ def is_address(ent):
     )
 
 
-def filter_spans(a_list, b_list):
-    # filtra spans de a_list que se overlapeen con algun span de b_list
-    def overlap(span, span_list):
-        for s in span_list:
-            if (span.start >= s.start and span.start < s.end) or (s.start >= span.start and s.end <= span.end):
-                return True
-        return False
-
-    return [span for span in a_list if not overlap(span, b_list)]
-
-
 class EntityCustom(object):
     name = "entity_custom"
 
@@ -226,7 +215,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
-            if not is_from_first_tokens(ent.start) and is_period(ent):
+            if not is_from_first_tokens(ent.start) and is_period(ent, doc):
                 new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
@@ -247,7 +236,6 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
 
         if new_ents:
-            filtered_ents = filter_spans(doc.ents, new_ents)
-            doc.ents = list(filtered_ents) + new_ents
+            doc.ents = filter_spans(list(doc.ents) + new_ents)
 
         return doc
