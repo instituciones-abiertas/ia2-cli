@@ -209,7 +209,7 @@ class ArticlesMatcher(object):
                     {"LOWER": {"IN": article_left_nbors}},
                     {"IS_PUNCT": True, "OP": "?"},
                     {"IS_DIGIT": True, "OP": "+"},
-                    *repeat_patterns([{"IS_PUNCT": True, "OP": "*"}, {"IS_DIGIT": True, "OP": "?"}], 14),
+                    *repeat_patterns([{"ORTH": ",", "OP": "*"}, {"IS_DIGIT": True, "OP": "?"}], 14),
                     {"ORTH": "y", "OP": "?"},
                     {"IS_DIGIT": True, "OP": "?"},
                 ],
