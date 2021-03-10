@@ -1,3 +1,4 @@
+from lib.generic_matcher import GenericMatcher, repeat_patterns
 from spacy.matcher import Matcher
 from spacy.tokens import Span
 from spacy.lang.es.lex_attrs import _num_words
@@ -39,26 +40,14 @@ first_left_nbors = [
     "pág",
     "pág.",
     "fs",
-    "art",
-    "arts",
     "inciso",
-    "articulo",
-    "artículo",
-    "artículos",
-    "articulos",
     "inc",
 ]
 second_left_nbors = [
     "página",
     "pag",
     "fs",
-    "art",
-    "arts",
     "inciso",
-    "articulo",
-    "artículo",
-    "artículos",
-    "articulos",
     "inc",
 ]
 first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
@@ -143,17 +132,18 @@ class EntityMatcher(object):
 
     name = "entity_matcher"
 
-    def __init__(self, nlp, matcher_patterns=matcher_patterns):
+    def __init__(self, nlp, matcher_patterns=matcher_patterns, *, after_callbacks=[]):
         self.nlp = nlp
         self.matcher = Matcher(self.nlp.vocab, validate=True)
         # Adds patterns to the Matcher pipeline
         for entity_label, pattern in matcher_patterns:
             self.matcher.add(entity_label, [pattern], on_match=None)
+        self.after_callbacks = after_callbacks
 
     def __call__(self, doc):
         matches = self.matcher(doc)
-
         matched_spans = [Span(doc, start, end, self.nlp.vocab.strings[match_id]) for match_id, start, end in matches]
+        # Merges adjacent entities and removes overlapped entities
         filtered_spans = filter_spans(matched_spans)
 
         for span in filtered_spans:
@@ -192,4 +182,35 @@ class EntityMatcher(object):
                 # somewhere else
                 print(f"[FIXME] Should process this span as another ent: `{span}`")
 
+        for after_callback in self.after_callbacks:
+            doc = after_callback(doc)
+
         return doc
+
+
+article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
+
+
+class ArticlesMatcher(object):
+    name = "articles_matcher"
+
+    def __init__(self, nlp):
+        article_patterns = self.get_article_patterns()
+        self.matcher = GenericMatcher(nlp, article_patterns, matches_priority="override")
+
+    def __call__(self, doc):
+        return self.matcher(doc)
+
+    def get_article_patterns(self):
+        return [
+            (
+                "ARTÍCULO",
+                [
+                    {"LOWER": {"IN": article_left_nbors}},
+                    {"IS_DIGIT": True, "OP": "+"},
+                    *repeat_patterns([{"IS_PUNCT": True, "OP": "*"}, {"IS_DIGIT": True, "OP": "?"}], 14),
+                    {"ORTH": "y", "OP": "?"},
+                    {"IS_DIGIT": True, "OP": "?"},
+                ],
+            ),
+        ]
