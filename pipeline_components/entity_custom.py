@@ -65,7 +65,7 @@ def is_judge(ent):
     )
 
 
-def is_period(ent, doc):
+def is_period(ent):
     last_token = ent[len(ent) - 1]
     return ent.label_ in ["NUM"] and last_token.nbor(1).text in period_rules
 
@@ -215,7 +215,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
-            if not is_from_first_tokens(ent.start) and is_period(ent, doc):
+            if not is_from_first_tokens(ent.start) and is_period(ent):
                 new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
