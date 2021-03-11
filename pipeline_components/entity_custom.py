@@ -21,6 +21,11 @@ period_rules = [
     "meses",
 ]
 
+law_left_nbors = [
+    "ley",
+    "leyes",
+]
+
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -47,9 +52,13 @@ def is_expedienteNumber(token):
     ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
 
 
-def is_law(token, first_left_token, second_left_token, third_left_token):
-  law_texts = ["ley", "leyes"]
-  return token.like_num and (first_left_token.lower_ in law_texts or second_left_token.lower_ in law_texts or third_left_token.lower_ in law_texts)
+def is_law(ent, doc):
+    first_token = ent[0]
+    return ent.label_ == "NUM" and (
+        first_token.nbor(-1).lower_ in law_left_nbors
+        or first_token.nbor(-2).lower_ in law_left_nbors
+        or first_token.nbor(-3).lower_ in law_left_nbors
+    )
 
 
 def is_last(token_id, doc):
@@ -171,7 +180,6 @@ def is_address(ent):
     first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
     second_left_nbors = [
         "instalación",
-        "contramano",
         "sita",
         "sitas",
         "sito",
@@ -282,9 +290,9 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
-            if not is_from_first_tokens(token.i) and is_law(token, token.nbor(-1), token.nbor(-2), token.nbor(-3)):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="LEY"))
         for ent in doc.ents:
+            if not is_from_first_tokens(ent.start) and is_law(ent, doc):
+                new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
             if not is_from_first_tokens(ent.start) and is_period(ent):
                 new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
@@ -313,6 +321,8 @@ class EntityCustom(object):
                 
 
         if new_ents:
-            doc.ents = filter_spans(list(doc.ents) + new_ents)
+            # We'd always want the new entities to be appended first because
+            # filter_spans prioritizes the first occurrences on overlapping
+            doc.ents = filter_spans(new_ents + list(doc.ents))
 
         return doc
