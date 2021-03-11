@@ -200,6 +200,7 @@ def is_address(ent):
 
 
 def could_be_an_article(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -211,6 +212,7 @@ def could_be_an_article(ent):
 
 
 def is_license_plate(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -221,6 +223,7 @@ def is_license_plate(ent):
 
 
 def get_start_end_license_plate(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     first_right_token = token.nbor(1).lower_
