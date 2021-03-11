@@ -1,6 +1,6 @@
 from spacy.tokens import Span
+from spacy.util import filter_spans
 import re
-
 
 period_rules = [
     "segundo",
@@ -71,8 +71,8 @@ def is_judge(ent):
 
 
 def is_period(ent):
-    first_token = ent[0]
-    return ent.label_ in ["NUM"] and first_token.nbor(1).text in period_rules
+    last_token = ent[len(ent) - 1]
+    return ent.label_ in ["NUM"] and last_token.nbor(1).text in period_rules
 
 
 def is_secretary(ent):
@@ -313,7 +313,6 @@ class EntityCustom(object):
                 
 
         if new_ents:
-            filtered_ents = filter_spans(doc.ents, new_ents)
-            doc.ents = list(filtered_ents) + new_ents
+            doc.ents = filter_spans(list(doc.ents) + new_ents)
 
         return doc
