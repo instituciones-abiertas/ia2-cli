@@ -49,10 +49,16 @@ class EntityCustomTest(unittest.TestCase):
                 "Si se tratare de un instrumento público y con prisión de 67985 {}, si se tratare de un instrumento privado",
             ),
             (
-                "veintitrés",
+                "veintitrés mil quinientos",
                 11,
-                12,
-                "Si se tratare de un instrumento público y con prisión de veintitrés {}, si se tratare de un instrumento privado",
+                14,
+                "Si se tratare de un instrumento público y con prisión de veintitrés mil quinientos {}, si se tratare de un instrumento privado",
+            ),
+            (
+                "tres mil ochocientos noventa y nueve",
+                11,
+                17,
+                "Si se tratare de un instrumento público y con prisión de tres mil ochocientos noventa y nueve {}, si se tratare de un instrumento privado",
             ),
         ]
         for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
@@ -61,10 +67,10 @@ class EntityCustomTest(unittest.TestCase):
                 doc = self.nlp(test_sentence)
                 # Checks that the text is tokenized the way we expect, so that we
                 # can correctly pick up a span with text "seis {nbor}"
-                a_like_num_span = Span(doc, target_span_start, target_span_end + 1, "PERIODO")
+                a_like_num_span = Span(doc, target_span_start, target_span_end + 1, label="PERIODO")
                 expected_period = f"{target_span_text} {nbor_word}"
                 self.assertEqual(a_like_num_span.text, expected_period)
-                # Asserts a PERIODO like span exists in the document entities
+                # Asserts a PERIODO span exists in the document entities
                 self.assertIn(a_like_num_span, doc.ents)
 
 
