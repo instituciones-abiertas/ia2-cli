@@ -26,6 +26,15 @@ law_left_nbors = [
     "leyes",
 ]
 
+address_first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
+                    "avenida", "av.", "Avenida", "Av.", 
+                    "pasaje", "Pasaje", "Parcela", "parcela"]
+address_second_left_nbors = [
+    "instalación", "contramano", "sita", "sitas", "sito", "sitos",
+    "real", "domiciliado", "domiciliada", "constituido",
+    "constituida", "contramano", "intersección", "domicilio",
+    "ubicado", "registrado", "ubicada", "real"
+]
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -178,43 +187,32 @@ def is_phone(ent):
 
 
 def is_address(ent):
-    # FIXME "hasta" estaba dentro de first_left_nbors
-    # FIXME considerar unificar las listas first_left_nbors y second_left_nbors
-    # FIXME si no se unifican, deberían quedar consumibles de otra manera
-    first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
-                        "avenida", "av.", "Avenida", "Av.", "pasaje", "Pasaje"]
-    second_left_nbors = [
-        "instalación", "contramano", "sita", "sitas", "sito", "sitos",
-        "real", "domiciliado", "domiciliada", "constituido",
-        "constituida", "contramano", "intersección", "domicilio",
-        "ubicado", "registrado", "ubicada", "real"
-    ]
     first_token = ent[0]
     last_token = ent[-1]
-    is_address_1_tokens_to_left = first_token.nbor(-1).lower_ in first_left_nbors
-    is_address_2_tokens_to_left = first_token.nbor(-2).lower_ in second_left_nbors
+    is_address_1_tokens_to_left = first_token.nbor(-1).lower_ in address_first_left_nbors
+    is_address_2_tokens_to_left = first_token.nbor(-2).lower_ in address_second_left_nbors
     try:
-        is_address_3_tokens_to_left = first_token.nbor(-3).lower_ in first_left_nbors
+        is_address_3_tokens_to_left = first_token.nbor(-3).lower_ in address_first_left_nbors
     except:
         is_address_3_tokens_to_left = False
     try:
-        is_address_4_tokens_to_left = first_token.nbor(-4).lower_ in first_left_nbors
+        is_address_4_tokens_to_left = first_token.nbor(-4).lower_ in address_first_left_nbors
     except:
         is_address_4_tokens_to_left = False
 
     is_address = ent.label_ in ["NUM"] and (
         is_address_1_tokens_to_left
         or is_address_2_tokens_to_left
-        or first_token.nbor(-2).lower_ in first_left_nbors
+        or first_token.nbor(-2).lower_ in address_first_left_nbors
         or is_address_3_tokens_to_left
         or is_address_4_tokens_to_left
     )
-#    if is_address:
-#    print(f"ent: {ent}   ent.label_: {ent.label_}")
-#    print(f"first_token.nbor(-1) {first_token.nbor(-1).lower_}")
-#    print(f"first_token.nbor(-2) {first_token.nbor(-2).lower_}")
-#      print(f"first_token.nbor(-3) {first_token.nbor(-3).lower_}")
-#      print(f"first_token.nbor(-4) {first_token.nbor(-4).lower_}")
+    if is_address:
+        print(f"ent: {ent}   ent.label_: {ent.label_}")
+        print(f"first_token.nbor(-1) {first_token.nbor(-1).lower_}")
+        print(f"first_token.nbor(-2) {first_token.nbor(-2).lower_}")
+        print(f"first_token.nbor(-3) {first_token.nbor(-3).lower_}")
+        print(f"first_token.nbor(-4) {first_token.nbor(-4).lower_}")
     return (ent.label_ in ["PER"] and (
         is_address_1_tokens_to_left
         or is_address_2_tokens_to_left
@@ -223,37 +221,16 @@ def is_address(ent):
     ) or is_address)
 
 
-def get_aditional_tokens_for_address(ent):
-    first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
-                        "avenida", "av.", "Avenida", "Av.", "pasaje", "Pasaje"]
-    second_left_nbors = [
-        "instalación",
-        "sita",
-        "sitas",
-        "sito",
-        "sitos",
-        "real",
-        "domiciliado",
-        "domiciliada",
-        "constituido",
-        "constituida",
-        "contramano",
-        "intersección",
-        "domicilio",
-        "ubicado",
-        "registrado",
-        "ubicada",
-        "real",
-    ]
+def get_aditional_left_tokens_for_address(ent):
     if ent.label_ in ["NUM"]:
         token = ent[0]
-        if token.nbor(-1).lower_ in first_left_nbors:
+        if token.nbor(-1).lower_ in address_first_left_nbors:
             return 1
-        if token.nbor(-2).lower_ in second_left_nbors or token.nbor(-2).lower_ in first_left_nbors:
+        if token.nbor(-2).lower_ in address_second_left_nbors or token.nbor(-2).lower_ in address_first_left_nbors:
             return 2
-        if token.nbor(-3).lower_ in first_left_nbors:
+        if token.nbor(-3).lower_ in address_first_left_nbors:
             return 3
-        if token.nbor(-4).lower_ in first_left_nbors:
+        if token.nbor(-4).lower_ in address_first_left_nbors:
             return 4
     return 0
 
@@ -321,13 +298,14 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
 
             if not is_from_first_tokens(ent.start) and is_address(ent):
+                #FIXME se pueden unificar los token adicionales?
                 token_adicional = 1 if ent[-1].nbor().like_num else 0
-                address_token = get_aditional_tokens_for_address(ent)
-                print(f"ent: {ent} - address_token {address_token}")
+                address_token = get_aditional_left_tokens_for_address(ent)
+                #print(f"ent: {ent} - address_token {address_token}")
                 if address_token > 1:
-                  new_ent_start = ent.start - address_token + 1
-                  #filtered = [new_ent for new_ent in new_ents if new_ent_start >= new_ent.start and new_ent_start <= new_ent.end or ent.end >= new_ent.start and ent.end <= new_ent.end]
+                  new_ent_start = ent.start - address_token #+ 1
 
+                  #TODO se podría usar remove_wrong_labeled_entity_span() que está en el branch de mejora_patente
                   span_to_remove_index = None
                   for i, new_ent in enumerate(new_ents):
                     if new_ent_start >= new_ent.start and new_ent_start <= new_ent.end or ent.end >= new_ent.start and ent.end <= new_ent.end:
@@ -335,9 +313,9 @@ class EntityCustom(object):
                       break
 
                   if span_to_remove_index:
-                    print(f"ANTES new_ents {new_ents}")
+                    #print(f"ANTES new_ents {new_ents}")
                     filtered = new_ents.pop(span_to_remove_index)
-                    print(f"DESP POP new_ents {new_ents}")
+                    #print(f"DESP POP new_ents {new_ents}")
                     #print(f"ent.end - new_ent_start = {ent.end - new_ent_start}")
                     #print(f"filtered.end - filtered.start = {filtered.end - filtered.start}")
                     if (ent.end - new_ent_start) > (filtered.end - filtered.start):
@@ -347,7 +325,7 @@ class EntityCustom(object):
                     #print(f"DESPUES new_ents {new_ents}")
                   else:
                     new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
-                    print(f"DESPUES new_ents {new_ents}")
+                    #print(f"DESPUES new_ents {new_ents}")
                 else:
                   new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
                 

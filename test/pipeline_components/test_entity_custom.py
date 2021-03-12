@@ -106,6 +106,7 @@ class EntityCustomTest(unittest.TestCase):
                 # Asserts a PERIODO span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
 
+#TODO agregar tests DIRECCION
 
 if __name__ == "__main__":
     unittest.main()
