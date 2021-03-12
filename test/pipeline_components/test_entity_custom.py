@@ -108,7 +108,6 @@ class EntityCustomTest(unittest.TestCase):
                 self.assertIn(expected_span, doc.ents)
 
     def test_a_custom_entity_pipeline_detects_license_plates_entities(self):
-        #TODO NO debería decir que "174bis" es una patente
         base_test_senteces = [
             (
                 "AAA 410",
@@ -145,9 +144,27 @@ class EntityCustomTest(unittest.TestCase):
                 expected_span = Span(doc, target_span_start, target_span_end, label="PATENTE_DOMINIO")
                 self.assertEqual(expected_span.text, target_span_text)
                 # Asserts a PATENTE_DOMINIO span exists in the document entities
-                print(f"doc.ents {doc.ents}")
                 self.assertIn(expected_span, doc.ents)
 
+    def test_a_custom_entity_pipeline_removes_articles_marked_as_license_plates_entities(self):
+        base_test_senteces = [
+            (
+                "174bis",
+                27,
+                28,
+                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP)."
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            test_sentence = base_test_sentece_text.format(article_marked_as_license_plate=target_span_text)
+            doc = self.nlp(test_sentence)
+            # Checks that the text is tokenized the way we expect, so that we
+            # can correctly pick up a span with text "174bis"
+            expected_span = Span(doc, target_span_start, target_span_end, label="ART")
+            self.assertEqual(expected_span.text, target_span_text)
+            # Asserts a ART span exists in the document entities
+            self.assertNotIn(expected_span, doc.ents)
 
 if __name__ == "__main__":
     unittest.main()

@@ -250,17 +250,9 @@ def get_start_end_license_plate(ent):
         return ent.start, ent.end + 1
 
 
-def remove_wrong_labeled_entity_span(doc, ent):
-    found_ent = None
-    for i, new_ent in enumerate(doc.ents):
-        if ent.start == new_ent.start and ent.end == new_ent.end:
-            found_ent = new_ent
-            break
-
-    if found_ent:
-        filtered_ents = filter_spans(list(doc.ents)+[found_ent])
-        doc.ents = list(filtered_ents) 
-
+def remove_wrong_labeled_entity_span(doc, ent_to_remove):
+    filtered = [ent for ent in doc.ents if not (ent_to_remove.start == ent.start and ent_to_remove.end == ent.end)]
+    doc.ents = filtered
 
 class EntityCustom(object):
     name = "entity_custom"
