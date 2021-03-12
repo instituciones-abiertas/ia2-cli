@@ -712,7 +712,7 @@ class SpacyUtils:
 
         # Copio archivos con modulos custom al directorio pipe_components (no uso model_components para que sea fijo y siempre el mismo en nuestro componente, y asi poder desacoplarlo de cuando tengamos multiples clientes
         package_components_dir = "pipeline_components"
-        files_src = ["entity_matcher.py", "entity_custom.py"]
+        files_src = ["entity_matcher.py", "entity_custom.py", "generic_matcher.py"]
         dest_component_dir = os.path.join(package_base_path, package_dir, package_components_dir)
         os.mkdir(dest_component_dir)
         for f in files_src:
