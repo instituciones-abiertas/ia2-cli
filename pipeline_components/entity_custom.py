@@ -56,7 +56,7 @@ def is_expedienteNumber(token):
     ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
 
 
-def is_law(ent, doc):
+def is_law(ent):
     first_token = ent[0]
     return ent.label_ == "NUM" and (
         first_token.nbor(-1).lower_ in law_left_nbors
@@ -282,7 +282,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
-            if not is_from_first_tokens(ent.start) and is_law(ent, doc):
+            if not is_from_first_tokens(ent.start) and is_law(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
             if not is_from_first_tokens(ent.start) and is_period(ent):
                 new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
