@@ -750,6 +750,49 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
             f.writelines(content)
         logger.info("Succesfully write language factories to model")
 
+    def show_text(self, files_path: str, entity: str, context_words: int = 0):
+        """
+        Given the path to a dataturks .json format input file directory and an
+        entity name, prints the annotation text from label.
+
+        :param files_path: Directory pointing to dataturks .json files
+        :param entity: entity label name.
+        :param context_words: integer for nbor words.
+        """
+        files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
+        texts = []
+
+        for file_ in files:
+            with open(file_, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    data = json.loads(line)
+                    for a in data["annotation"] or []:
+                        output = ""
+                        if a["label"][0] == entity:
+                            if not a["points"][0]["text"] in texts:
+                                text = a["points"][0]["text"]
+                                if context_words:
+                                    text = re.escape(a["points"][0]["text"])
+                                    interval = r"{{0,{0}}}".format(context_words)
+                                    regex = (
+                                        r"((?:\S+\s+)"
+                                        + interval
+                                        + r"\b"
+                                        + text
+                                        + r"\b\s*(?:\S+\b\s*)"
+                                        + interval
+                                        + ")"
+                                    )
+                                    x = re.search(regex, data["content"])
+                                    if x:
+                                        output = x.group()
+                                else:
+                                    output = text
+                                texts.append(output)
+        for text in texts:
+            print(text)
+
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
