@@ -1,5 +1,30 @@
 from spacy.tokens import Span
+from spacy.util import filter_spans
 import re
+
+period_rules = [
+    "segundo",
+    "segundos",
+    "minuto",
+    "minutos",
+    "hr",
+    "hs",
+    "hora",
+    "horas",
+    "año",
+    "años",
+    "dia",
+    "día",
+    "dias",
+    "días",
+    "mes",
+    "meses",
+]
+
+law_left_nbors = [
+    "ley",
+    "leyes",
+]
 
 
 def is_age(token, right_token, token_sent):
@@ -27,6 +52,15 @@ def is_expedienteNumber(token):
     ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
 
 
+def is_law(ent):
+    first_token = ent[0]
+    return ent.label_ == "NUM" and (
+        first_token.nbor(-1).lower_ in law_left_nbors
+        or first_token.nbor(-2).lower_ in law_left_nbors
+        or first_token.nbor(-3).lower_ in law_left_nbors
+    )
+
+
 def is_last(token_id, doc):
     return token_id == len(doc) - 1
 
@@ -43,6 +77,11 @@ def is_judge(ent):
         or first_token.nbor(-2).lemma_ in judge_lemma
         or first_token.nbor(-3).lemma_ in judge_lemma
     )
+
+
+def is_period(ent):
+    last_token = ent[len(ent) - 1]
+    return ent.label_ in ["NUM"] and last_token.nbor(1).text in period_rules
 
 
 def is_secretary(ent):
@@ -189,7 +228,6 @@ def get_aditional_tokens_for_address(ent):
                         "avenida", "av.", "Avenida", "Av.", "pasaje", "Pasaje"]
     second_left_nbors = [
         "instalación",
-        "contramano",
         "sita",
         "sitas",
         "sito",
@@ -247,17 +285,6 @@ def get_aditional_tokens_for_address(ent):
 #    ) or is_number_of_address)
 
 
-def filter_spans(a_list, b_list):
-    # filtra spans de a_list que se overlapeen con algun span de b_list
-    def overlap(span, span_list):
-        for s in span_list:
-            if (span.start >= s.start and span.start < s.end) or (s.start >= span.start and s.end <= span.end):
-                return True
-        return False
-
-    return [span for span in a_list if not overlap(span, b_list)]
-
-
 class EntityCustom(object):
     name = "entity_custom"
 
@@ -278,6 +305,10 @@ class EntityCustom(object):
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
         for ent in doc.ents:
+            if not is_from_first_tokens(ent.start) and is_law(ent):
+                new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
+            if not is_from_first_tokens(ent.start) and is_period(ent):
+                new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
             if not is_from_first_tokens(ent.start) and is_secretary(ent):
@@ -328,7 +359,8 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
 
         if new_ents:
-            filtered_ents = filter_spans(doc.ents, new_ents)
-            doc.ents = list(filtered_ents) + new_ents
+            # We'd always want the new entities to be appended first because
+            # filter_spans prioritizes the first occurrences on overlapping
+            doc.ents = filter_spans(new_ents + list(doc.ents))
 
         return doc
