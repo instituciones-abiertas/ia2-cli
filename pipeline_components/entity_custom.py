@@ -26,6 +26,10 @@ law_left_nbors = [
     "leyes",
 ]
 
+license_plate_left_nbor = [
+    "patente", 
+    "dominio",
+]
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -213,10 +217,9 @@ def could_be_an_article(ent):
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
     third_left_token = token.nbor(-3).lower_
-    license_texts = ["patente", "dominio"]
     dont_consider = "bis"
     
-    return ent.label_ == "PATENTE_DOMINIO" and token.lower_.find(dont_consider) != -1 and first_left_token not in license_texts and second_left_token not in license_texts and third_left_token not in license_texts
+    return ent.label_ == "PATENTE_DOMINIO" and token.lower_.find(dont_consider) != -1 and first_left_token not in license_plate_left_nbor and second_left_token not in license_plate_left_nbor and third_left_token not in license_plate_left_nbor
 
 
 def is_license_plate(ent):
@@ -225,9 +228,8 @@ def is_license_plate(ent):
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
     third_left_token = token.nbor(-3).lower_
-    license_texts = ["patente", "dominio"]
 
-    return token.like_num and (first_left_token in license_texts or second_left_token in license_texts or third_left_token in license_texts)
+    return token.like_num and (first_left_token in license_plate_left_nbor or second_left_token in license_plate_left_nbor or third_left_token in license_plate_left_nbor)
 
 
 def get_start_end_license_plate(ent):
@@ -256,19 +258,8 @@ def remove_wrong_labeled_entity_span(doc, ent):
             break
 
     if found_ent:
-        filtered_ents = filter_spans(doc.ents, [found_ent])
-        doc.ents = list(filtered_ents)    
-
-
-def filter_spans(a_list, b_list):
-    # filtra spans de a_list que se overlapeen con algun span de b_list
-    def overlap(span, span_list):
-        for s in span_list:
-            if (span.start >= s.start and span.start < s.end) or (s.start >= span.start and s.end <= span.end):
-                return True
-        return False
-
-    return [span for span in a_list if not overlap(span, b_list)]
+        filtered_ents = filter_spans(list(doc.ents)+[found_ent])
+        doc.ents = list(filtered_ents) 
 
 
 class EntityCustom(object):
@@ -314,7 +305,6 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
             if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
                 remove_wrong_labeled_entity_span(doc, ent)
-
             if not is_from_first_tokens(token.i) and is_license_plate(ent):
                 start, end = get_start_end_license_plate(ent)
                 new_ents.append(Span(doc, start, end, label="PATENTE_DOMINIO"))                
