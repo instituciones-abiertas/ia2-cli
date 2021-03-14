@@ -53,7 +53,7 @@ Descargar un modelo base
 python -m spacy download es_core_news_lg
 ```
 
-Crear un modelo basado en `es_core_news_lg`
+Crear un modelo basado en `es_core_news_lg` y guardarlo en la carpeta `models/base/2021-01-19`
 
 ```bash
 python train.py create_custom_spacy_model \
@@ -61,7 +61,7 @@ python train.py create_custom_spacy_model \
   "models/base/2021-01-19"
 ```
 
-Agregar las entidades que nos interesan detectar en el modelo
+Agregar las entidades que nos interesan detectar en el modelo ([entidades soportadas](NER.md))
 
 ```bash
 python train.py add_new_entity_to_model \
@@ -69,10 +69,10 @@ python train.py add_new_entity_to_model \
   "models/base/2021-01-19"
 ```
 
-Entrenar un modelo
+Entrenar un modelo (crear previamente un archivo `train_config.json` basado en `example_train_config.json`)
 
 ```bash
-python train.py example_train_config example_tuning_hyperparams
+python train.py train example_tuning_hyperparams
 ```
 
 ## Línea de Comandos
