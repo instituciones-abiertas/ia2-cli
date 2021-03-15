@@ -2,6 +2,7 @@ from pipeline_components.entity_custom import (
     EntityCustom,
     law_left_nbors,
     period_rules,
+    license_plate_left_nbor,
 )
 from pipeline_components.entity_matcher import (
     EntityMatcher,
@@ -103,10 +104,67 @@ class EntityCustomTest(unittest.TestCase):
                 # can correctly pick up a span with text "seis {nbor}"
                 expected_span = Span(doc, target_span_start, target_span_end, label="LEY")
                 self.assertEqual(expected_span.text, law_num)
-                # Asserts a PERIODO span exists in the document entities
+                # Asserts a LEY span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
 
-#TODO agregar tests DIRECCION
+    def test_a_custom_entity_pipeline_detects_license_plates_entities(self):
+        base_test_senteces = [
+            (
+                "AAA 410",
+                23,
+                25,
+                "Tal situación tuvo lugar, en circunstancias en que ambos se encontraban en el interior del vehículo marca Renault Trafic, {license_plate_nbor} colocado {license_plate}."
+            ),
+            (
+                "AC 154 BC",
+                4,
+                7,
+                "El vehículo {license_plate_nbor}: {license_plate} fue encontrado prendido fuego en la intersección de las Avenidas 1 y 2.",
+            ),
+            (
+                "AC154BC",
+                9,
+                10,
+                "Schumacher, Michael circulaba en el vehículo con {license_plate_nbor} {license_plate} a altas velocidades mientras tiraba objetos desde su vehículo.",
+            ),
+            (
+                "110 ABC",
+                3,
+                5,
+                "{license_plate_nbor} del vehículo {license_plate}, fue visto por última vez el 24 de mayo de 1996.",
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            for nbor_word in license_plate_left_nbor:
+                test_sentence = base_test_sentece_text.format(license_plate_nbor=nbor_word, license_plate=target_span_text)
+                doc = self.nlp(test_sentence)
+                # Checks that the text is tokenized the way we expect, so that we
+                # can correctly pick up a span with text "{nbor} AAA 410"
+                expected_span = Span(doc, target_span_start, target_span_end, label="PATENTE_DOMINIO")
+                self.assertEqual(expected_span.text, target_span_text)
+                # Asserts a PATENTE_DOMINIO span exists in the document entities
+                self.assertIn(expected_span, doc.ents)
+
+    def test_a_custom_entity_pipeline_removes_articles_marked_as_license_plates_entities(self):
+        base_test_senteces = [
+            (
+                "174bis",
+                27,
+                28,
+                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP)."
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            test_sentence = base_test_sentece_text.format(article_marked_as_license_plate=target_span_text)
+            doc = self.nlp(test_sentence)
+            # Checks that the text is tokenized the way we expect, so that we
+            # can correctly pick up a span with text "174bis"
+            expected_span = Span(doc, target_span_start, target_span_end, label="ART")
+            self.assertEqual(expected_span.text, target_span_text)
+            # Asserts a ART span exists in the document entities
+            self.assertNotIn(expected_span, doc.ents)
 
 if __name__ == "__main__":
     unittest.main()
