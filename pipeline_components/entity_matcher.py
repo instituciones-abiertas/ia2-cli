@@ -196,7 +196,7 @@ class ArticlesMatcher(object):
 
     def __init__(self, nlp):
         article_patterns = self.get_article_patterns()
-        self.matcher = GenericMatcher(nlp, article_patterns, matches_priority="override")
+        self.matcher = GenericMatcher(nlp, article_patterns)
 
     def __call__(self, doc):
         return self.matcher(doc)
