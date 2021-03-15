@@ -249,10 +249,8 @@ def get_start_end_license_plate(ent):
         #3 núm - 3 letras
         return ent.start, ent.end + 1
 
-
-def remove_wrong_labeled_entity_span(doc, ent_to_remove):
-    filtered = [ent for ent in doc.ents if not (ent_to_remove.start == ent.start and ent_to_remove.end == ent.end)]
-    doc.ents = filtered
+def remove_wrong_labeled_entity_span(ent_list, ent_to_remove):
+    return [ent for ent in ent_list if not (ent_to_remove.start == ent.start and ent_to_remove.end == ent.end)]
 
 class EntityCustom(object):
     name = "entity_custom"
@@ -296,7 +294,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(ent.start) and is_phone(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
             if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
-                remove_wrong_labeled_entity_span(doc, ent)
+                doc.ents = remove_wrong_labeled_entity_span(doc.ents, ent)
             if not is_from_first_tokens(token.i) and is_license_plate(ent):
                 start, end = get_start_end_license_plate(ent)
                 new_ents.append(Span(doc, start, end, label="PATENTE_DOMINIO"))                
