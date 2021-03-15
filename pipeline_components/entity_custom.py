@@ -274,7 +274,7 @@ class EntityCustom(object):
         for ent in doc.ents:
             if not is_from_first_tokens(ent.start) and is_law(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
-            if not is_from_first_tokens(ent.start) and is_period(ent):
+            if not is_last(ent.start, doc) and is_period(ent):
                 new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
             if not is_from_first_tokens(ent.start) and is_judge(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="JUEZ/A"))
