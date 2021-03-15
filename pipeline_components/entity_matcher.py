@@ -1,4 +1,4 @@
-from lib.generic_matcher import GenericMatcher, repeat_patterns
+from pipeline_components.generic_matcher import GenericMatcher, repeat_patterns
 from spacy.matcher import Matcher
 from spacy.tokens import Span
 from spacy.lang.es.lex_attrs import _num_words
