@@ -26,6 +26,10 @@ law_left_nbors = [
     "leyes",
 ]
 
+license_plate_left_nbor = [
+    "patente", 
+    "dominio",
+]
 
 def is_age(token, right_token, token_sent):
     return token.like_num and right_token.text == "años" and "edad" in token_sent.text
@@ -176,7 +180,6 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
-
 def is_address(ent):
     first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
     second_left_nbors = [
@@ -207,6 +210,47 @@ def is_address(ent):
         or last_token.nbor().like_num
     )
 
+
+def could_be_an_article(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
+    token = ent[0]
+    first_left_token = token.nbor(-1).lower_
+    second_left_token = token.nbor(-2).lower_
+    third_left_token = token.nbor(-3).lower_
+    dont_consider = "bis"
+    
+    return ent.label_ == "PATENTE_DOMINIO" and token.lower_.find(dont_consider) != -1 and first_left_token not in license_plate_left_nbor and second_left_token not in license_plate_left_nbor and third_left_token not in license_plate_left_nbor
+
+
+def is_license_plate(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
+    token = ent[0]
+    first_left_token = token.nbor(-1).lower_
+    second_left_token = token.nbor(-2).lower_
+    third_left_token = token.nbor(-3).lower_
+
+    return token.like_num and (first_left_token in license_plate_left_nbor or second_left_token in license_plate_left_nbor or third_left_token in license_plate_left_nbor)
+
+
+def get_start_end_license_plate(ent):
+    #TODO deberíamos centralizar esta extracción de tokens según posición
+    token = ent[0]
+    first_left_token = token.nbor(-1).lower_
+    first_right_token = token.nbor(1).lower_
+    if len(ent.text) != 3: #this means it is not an "incomplete" license plate
+        return ent.start, ent.end
+    if len(first_left_token) == 3 and isinstance(first_left_token, str):
+        #3 letras - 3 núm
+        return ent.start - 1, ent.end
+    if len(first_left_token) == 2 and len(first_right_token) == 2 and isinstance(first_left_token, str) and isinstance(first_right_token, str):
+        #2 letras - 3 núm - 2 letras
+        return ent.start - 1, ent.end + 1
+    if len(first_right_token) == 3 and isinstance(first_right_token, str):
+        #3 núm - 3 letras
+        return ent.start, ent.end + 1
+
+def remove_wrong_labeled_entity_span(ent_list, ent_to_remove):
+    return [ent for ent in ent_list if not (ent_to_remove.start == ent.start and ent_to_remove.end == ent.end)]
 
 class EntityCustom(object):
     name = "entity_custom"
@@ -249,6 +293,12 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
             if not is_from_first_tokens(ent.start) and is_phone(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
+            if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
+                doc.ents = remove_wrong_labeled_entity_span(doc.ents, ent)
+            if not is_from_first_tokens(token.i) and is_license_plate(ent):
+                start, end = get_start_end_license_plate(ent)
+                new_ents.append(Span(doc, start, end, label="PATENTE_DOMINIO"))                
+                
 
         if new_ents:
             # We'd always want the new entities to be appended first because
