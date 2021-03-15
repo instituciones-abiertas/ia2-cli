@@ -1,6 +1,6 @@
 import unittest
 from spacy.tokens import Span
-from test.support.env_case import setup_model
+from test.support.env_case import ModelSetup
 import random
 import string
 
@@ -11,7 +11,8 @@ def random_string_generator(str_size, allowed_chars):
 
 class EntityRulerTest(unittest.TestCase):
     def setUp(self):
-        self.nlp = setup_model()
+        pipeline = ["entity_ruler", "entity_matcher", "entity_custom"]
+        self.nlp = ModelSetup(pipeline)
 
     def test_an_entity_ruler_does_find_NOMBRE_ARCHIVO(self):
         chars = string.ascii_letters

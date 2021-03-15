@@ -13,7 +13,7 @@ from pipeline_components.entity_ruler import ruler_patterns
 from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.data_case import generate_fake_sentences
-from test.support.env_case import get_model_path
+from test.support.env_case import ModelSetup
 
 import spacy
 import unittest
@@ -22,7 +22,7 @@ import unittest
 class ArticleMatcherTest(unittest.TestCase):
     def setUp(self):
         # Loads a Spacy model
-        nlp = spacy.load(get_model_path())
+        nlp = ModelSetup()
         ruler = EntityRuler(nlp, overwrite_ents=True)
         ruler.add_patterns(ruler_patterns)
         nlp.add_pipe(ruler)
