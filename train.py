@@ -759,6 +759,10 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         :param entity: entity label name.
         :param context_words: integer for nbor words.
         """
+
+        W = "\033[0m"  # white (normal)
+        R = "\033[31m"  # red
+        G = "\033[32m"  # green
         files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
         texts = []
 
@@ -787,9 +791,14 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                                     x = re.search(regex, data["content"])
                                     if x:
                                         output = x.group()
+                                        output = output.replace(text.replace("\\", ""), R + text + W)
                                 else:
                                     output = text
-                                texts.append(output)
+                                posicion = " -- Start: {}{} {}End: {}{}{}".format(
+                                    G, str(a["points"][0]["start"]), W, G, str(a["points"][0]["end"]), W
+                                )
+                                texts.append(output.replace("\\", "") + posicion)
+
         for text in texts:
             print(text)
 
