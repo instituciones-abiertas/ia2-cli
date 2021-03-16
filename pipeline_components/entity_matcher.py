@@ -215,3 +215,68 @@ class ArticlesMatcher(object):
                 ],
             ),
         ]
+
+
+violence_nbors = ["violencia", "violencias"]
+
+violence_types = [
+    "ambiental",
+    "doméstica",
+    "domestica",
+    "económica",
+    "economica",
+    "física",
+    "fisica",
+    "patrimonial",
+    "psicológica",
+    "psicologica",
+    "sexual",
+    "simbólica",
+    "simbolica",
+    "social",
+]
+
+gender_violence_types = ["género", "genero"]
+
+
+class ViolenceContextMatcher(object):
+    name = "violence_context_matcher"
+
+    def __init__(self, nlp):
+        violence_context_patterns = self.get_violence_context_patterns()
+        self.matcher = GenericMatcher(nlp, violence_context_patterns)
+
+    def __call__(self, doc):
+        return self.matcher(doc)
+
+    def get_violence_context_patterns(self):
+        return [
+            (
+                "CONTEXTO_VIOLENCIA_DE_GÉNERO",
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"ORTH": "de"},
+                    {"LOWER": {"IN": gender_violence_types}},
+                ],
+            ),
+            (
+                "CONTEXTO_VIOLENCIA",
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"LOWER": {"IN": violence_types}},
+                ],
+            ),
+            (
+                "CONTEXTO_VIOLENCIA",
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"LOWER": {"IN": violence_types}, "OP": "?"},
+                    *repeat_patterns([{"ORTH": ",", "OP": "*"}, {"LOWER": {"IN": violence_types}, "OP": "?"}], 7),
+                    {"ORTH": "y", "OP": "+"},
+                    {"LOWER": {"IN": violence_types}, "OP": "+"},
+                ],
+            ),
+        ]
