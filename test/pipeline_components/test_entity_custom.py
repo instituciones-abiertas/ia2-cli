@@ -102,8 +102,82 @@ class EntityCustomTest(unittest.TestCase):
                 # can correctly pick up a span with text "seis {nbor}"
                 expected_span = Span(doc, target_span_start, target_span_end, label="LEY")
                 self.assertEqual(expected_span.text, law_num)
-                # Asserts a LEY span exists in the document entities
+                # Asserts a PERIODO span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
+
+    def test_a_custom_entity_pipeline_detect_loc_entities(self):
+        locs = ["YPF", "504"]
+        base_test_senteces = [
+            (
+                4,
+                6,
+                "Existio un allanamiento en Barrio {loc_nbor} donde se encontraron estupefacientes ",
+            ),
+            (
+                12,
+                14,
+                "Existe un procedimiento a llevarse a cabo dentro del radio de la villa {loc_nbor} de la periferia de la ciudad",
+            ),
+            (
+                12,
+                14,
+                "Existe un procedimiento a llevarse a cabo dentro del radio de la localidad {loc_nbor} de la periferia de la ciudad",
+            ),
+            (
+                23,
+                25,
+                "En la mañana Fierro, Martin s/art. 23 Inculpar a vecino por desacato judicial o administrativa en la actualidad en Paraje {loc_nbor}",
+            ),
+        ]
+
+        test_sentences = list(itertools.product(locs, base_test_senteces))
+
+        for (left_nbor_word, (target_span_start, target_span_end, base_test_sentece_text)) in test_sentences:
+
+            test_sentence = base_test_sentece_text.format(loc_nbor=left_nbor_word)
+
+            doc = self.nlp(test_sentence)
+
+            expected_span = Span(doc, target_span_start, target_span_end, label="LOC")
+            # Check if span detected in doc.ents
+            self.assertIn(expected_span, doc.ents)
+
+    def test_a_custom_entity_pipeline_detect_false_positive_loc_entities(self):
+        # Primer test para chequear casos de falsos positivios en PER no esten incluidos en las ocurrencias detectadas
+        locs = ["Moreno", "Fierro"]
+        base_test_sentences = [
+            (
+                6,
+                8,
+                10,
+                12,
+                "En las personas de  Juan Antonio Barrio {loc_name} y mariela barrio {loc_name} se encontraron estupefacientes ",
+            ),
+            (6, 8, 10, 12, "Acompañada de otras personas como Roxana villa {loc_name}, Martín Villa {loc_name}  "),
+        ]
+
+        test_sentences = list(itertools.product(locs, base_test_sentences))
+        for (
+            right_loc_word,
+            (
+                target_span_start,
+                target_span_end,
+                another_target_span_start,
+                another_target_span_end,
+                base_test_sentece_text,
+            ),
+        ) in test_sentences:
+
+            test_sentence = base_test_sentece_text.format(loc_name=right_loc_word)
+
+            doc = self.nlp(test_sentence)
+
+            expected_span = Span(doc, target_span_start, target_span_end, label="LOC")
+            another_expected_span = Span(doc, another_target_span_start, another_target_span_end, label="LOC")
+            # Filtrado solo entidades del tipo LOC
+            # onlyLOCents = list(filter(lambda ent: ent.label_ == "LOC", doc.ents))
+            self.assertNotIn(expected_span, doc.ents)
+            self.assertNotIn(another_expected_span, doc.ents)
 
     def test_a_custom_entity_pipeline_detects_license_plates_entities(self):
         base_test_senteces = [
@@ -111,7 +185,7 @@ class EntityCustomTest(unittest.TestCase):
                 "AAA 410",
                 23,
                 25,
-                "Tal situación tuvo lugar, en circunstancias en que ambos se encontraban en el interior del vehículo marca Renault Trafic, {license_plate_nbor} colocado {license_plate}."
+                "Tal situación tuvo lugar, en circunstancias en que ambos se encontraban en el interior del vehículo marca Renault Trafic, {license_plate_nbor} colocado {license_plate}.",
             ),
             (
                 "AC 154 BC",
@@ -135,7 +209,9 @@ class EntityCustomTest(unittest.TestCase):
 
         for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
             for nbor_word in license_plate_left_nbor:
-                test_sentence = base_test_sentece_text.format(license_plate_nbor=nbor_word, license_plate=target_span_text)
+                test_sentence = base_test_sentece_text.format(
+                    license_plate_nbor=nbor_word, license_plate=target_span_text
+                )
                 doc = self.nlp(test_sentence)
                 # Checks that the text is tokenized the way we expect, so that we
                 # can correctly pick up a span with text "{nbor} AAA 410"
@@ -150,7 +226,7 @@ class EntityCustomTest(unittest.TestCase):
                 "174bis",
                 27,
                 28,
-                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP)."
+                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP).",
             ),
         ]
 
@@ -163,6 +239,7 @@ class EntityCustomTest(unittest.TestCase):
             self.assertEqual(expected_span.text, target_span_text)
             # Asserts a ART span exists in the document entities
             self.assertNotIn(expected_span, doc.ents)
+
 
 if __name__ == "__main__":
     unittest.main()

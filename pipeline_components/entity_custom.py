@@ -57,6 +57,21 @@ def is_expedienteNumber(token):
     ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
 
 
+def is_place_token(token):
+    # TODO Este enfoque puede generar falsos positivos
+    first_left_nbors = [
+        "barrio",
+        "villa",
+        "asentamiento",
+        "paraje",
+        "localidad",
+        "country",
+        "distrito",
+    ]
+
+    return token.nbor(-1).lower_ in first_left_nbors
+
+
 def is_law(ent):
     first_token = ent[0]
     return ent.label_ == "NUM" and (
@@ -290,6 +305,8 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
+            if not is_from_first_tokens(token.i) and is_place_token(token):
+                new_ents.append(Span(doc, token.i - 1, token.i + 1, label="LOC"))
         for ent in doc.ents:
             if not is_from_first_tokens(ent.start) and is_law(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
