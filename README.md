@@ -119,11 +119,25 @@ python train.py add_new_entity_to_model \
 "models/base/2021-01-19"
 ```
 
+### Ver texto de entidades
+> Útil para crear reglas con patrones
+
+- `files_path`: Directorio con archivos dataturks .json
+- `entity:  Nombre de la entidad
+- `context_words`: cantidad de palabras de contexto vecinas
+
+```bash
+python train.py show_text \
+  <files_path> \
+  <entity> \
+  <context_words>
+```
+
 ### Entrenamiento de modelo
 
 El entrenamiento guardará el mejor modelo (siempre que supere el threshold - leer parámetros de configuración), así como un archivo `history.csv` en la carpeta history (en la raiz del proyecto) en el que se explicitan parámetros y scores obtenidos por época (epoch).
 
-- `config_name`: nombre de la configuración que se usará para entrenar el modelo, dicha debería estar en un archivo de configuración con el nombre `train_config.json`. 
+- `config_name`: nombre de la configuración que se usará para entrenar el modelo, dicha debería estar en un archivo de configuración con el nombre `train_config.json`.
 
 ```bash
 python train.py train <config_name>
@@ -138,7 +152,7 @@ python train.py train example_tuning_hyperparams
 El archivo de configuración `train_config.json` se debe generar a partir de `example_train_config.json`. Los parámetros disponibles para modificar son:
 
 - `use_gpu`: valor booleano que determina si correr o no el entrenamiento usando el gpu. Se debe tener configurado CUDA toolkit y seguir este instructivo : [Ejecutar SpaCy con GPU](https://spacy.io/usage/#gpu).  **Nota**: tener en cuenta que el batch size afecta directamente el uso de memoria.
-- `path_data_training`: directorio de la data para entrenar el modelo 
+- `path_data_training`: directorio de la data para entrenar el modelo
 - `path_data_validation`: directorio de la data de validación para evaluar el modelo
 - `path_data_testing`: directorio de la data de testing para evaluar el modelo. Si está incluida esta opción los conjuntos de entrenamiento y validación serán combinados y utilizados para entrenamiento. Ver [F. Chollet, _Deep Learning in Python_ , cap. 4.2](https://livebook.manning.com/book/deep-learning-with-python/chapter-4/44)
 - `evaluate`: valor que determina que conjunto de datos usar para evaluar el modelo. Opciones `test` / `val`. `val` es el valor por defecto y no es necesario incluirlo
