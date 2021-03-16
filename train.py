@@ -33,7 +33,12 @@ from callbacks import (
 
 from spacy.pipeline import EntityRuler
 from pipeline_components.entity_ruler import ruler_patterns
-from pipeline_components.entity_matcher import ArticlesMatcher, EntityMatcher, matcher_patterns
+from pipeline_components.entity_matcher import (
+    ArticlesMatcher,
+    EntityMatcher,
+    ViolenceContextMatcher,
+    matcher_patterns,
+)
 from pipeline_components.entity_custom import EntityCustom
 
 logger = logging.getLogger("Spacy cli util")
@@ -694,7 +699,10 @@ class SpacyUtils:
         nlp.add_pipe(ruler)
 
         article_matcher = ArticlesMatcher(nlp)
-        entity_matcher = EntityMatcher(nlp, matcher_patterns, after_callbacks=[article_matcher])
+        violence_contexts_matcher = ViolenceContextMatcher(nlp)
+        entity_matcher = EntityMatcher(
+            nlp, matcher_patterns, after_callbacks=[article_matcher, violence_contexts_matcher]
+        )
         nlp.add_pipe(entity_matcher)
 
         entity_custom = EntityCustom(nlp)
