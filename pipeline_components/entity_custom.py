@@ -314,7 +314,7 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
             if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
                 doc.ents = remove_wrong_labeled_entity_span(doc.ents, ent)
-            if not is_from_first_tokens(token.i) and is_license_plate(ent):
+            if not is_from_first_tokens(ent.start) and is_license_plate(ent):
                 start, end = get_start_end_license_plate(ent)
                 new_ents.append(Span(doc, start, end, label="PATENTE_DOMINIO"))
 
