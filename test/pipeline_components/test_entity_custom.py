@@ -164,5 +164,9 @@ class EntityCustomTest(unittest.TestCase):
             # Asserts a ART span exists in the document entities
             self.assertNotIn(expected_span, doc.ents)
 
+    #TODO escribir tests!
+    def test_a_custom_entity_pipeline_detects_license_address_entities(self):
+        pass
+
 if __name__ == "__main__":
     unittest.main()
