@@ -283,6 +283,10 @@ export TEST_MODEL_FILE=models/path_to_my_model
 export TEST_MODEL_FILE=es_core_news_lg
 ```
 
+## Licencia
+
+[**GNU General Public License version 3**](LICENSE)
+
 ## Contribuciones
 
 Por favor, asegúrese de leer los [lineamientos de contribución](CONTRIBUTING.md) antes de realizar Pull Requests.

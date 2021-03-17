@@ -26,8 +26,8 @@ A la información detectada mediante el aprendizaje automático del modelo, se a
 |FECHA_HECHO|fecha de cuando sucedió el hecho|Solo identificable por intervención de personas| | Etiquetado Manual |
 |FECHA_NÚMERICA|fecha en números|Que el **03/07/2021** la situación sea aclarada|[Formatos soportados](pipeline_components/entity_ruler.py#L380)| Ruler |
 |FISCAL|nombre de fiscal nombrado en la causa|Fiscal: **Maria Gonzalez**|*Fiscal* o *fiscalía* antes de identificación como *PER* | Custom |
-|JUEZ/A|nombre de juez/jueza nombradx en la causa|Juez: **Luis Gonzalez**| *Juez* antes de identificación como *PER*| Custom |
-|DEFENSOR/A|nombre de defensor/a nombrado en la causa|Defensora: **Maria Gonzalez**|*Defensor* o *Defensora* antes de  identificación como *PER* | Custom |
+|JUEZX|nombre de juez/jueza nombradx en la causa|Juez: **Luis Gonzalez**| *Juez* antes de identificación como *PER*| Custom |
+|DEFENSORX|nombre de defensor/a nombrado en la causa|Defensora: **Maria Gonzalez**|*Defensor* o *Defensora* antes de  identificación como *PER* | Custom |
 |LEY|ley citada en la resolución|otros elementos presuntamente constitutivos de una infracción a la ley **23737**| Palabra *ley* antes de número| Custom |
 |LINK|enlace web|ingresó al sitio **https://www.google.com/** y buscó las palabras “como armar una bomba”|[Formato soportado](https://github.com/explosion/spaCy/blob/047fb9f8b8cfe99abc8455aa990fa2c2dd3d4c84/spacy/lang/lex_attrs.py#L124)| Ruler |
 |LUGAR_HECHO|lugar donde sucedió el evento|Solo identificable por intervención de personas| | Etiquetado Manual |
