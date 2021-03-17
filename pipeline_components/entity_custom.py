@@ -192,43 +192,48 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
+def get_token_in_x_left_pos(token, pos, nbors):
+    try:
+        return token.nbor(-pos).lower_ in nbors
+    except:
+        return False
 
 def is_address(ent):
     first_token = ent[0]
     last_token = ent[-1]
-    is_address_1_tokens_to_left = first_token.nbor(-1).lower_ in address_first_left_nbors
-    is_address_2_tokens_to_left = first_token.nbor(-2).lower_ in address_second_left_nbors
-    try:
-        is_address_3_tokens_to_left = first_token.nbor(-3).lower_ in address_first_left_nbors
-    except:
-        is_address_3_tokens_to_left = False
-    try:
-        is_address_4_tokens_to_left = first_token.nbor(-4).lower_ in address_first_left_nbors
-    except:
-        is_address_4_tokens_to_left = False
+    is_address_1_tokens_to_left = get_token_in_x_left_pos(first_token, 1, address_first_left_nbors)
+    is_address_2_tokens_to_left_first_nbors = get_token_in_x_left_pos(first_token, 2, address_first_left_nbors)
+    is_address_2_tokens_to_left_second_nbors = get_token_in_x_left_pos(first_token, 2, address_second_left_nbors)
+    is_address_3_tokens_to_left = get_token_in_x_left_pos(first_token, 3, address_first_left_nbors)
+    is_address_4_tokens_to_left = get_token_in_x_left_pos(first_token, 4, address_first_left_nbors)
 
-    is_address = ent.label_ in ["NUM"] and (
+    is_address_from_PER = ent.label_ in ["PER"] and (
         is_address_1_tokens_to_left
-        or is_address_2_tokens_to_left
-        or first_token.nbor(-2).lower_ in address_first_left_nbors
+        or is_address_2_tokens_to_left_second_nbors
+        or last_token.like_num
+        or last_token.nbor().like_num
+    )
+
+    is_address_from_NUM = ent.label_ in ["NUM"] and (
+        is_address_1_tokens_to_left
+        or is_address_2_tokens_to_left_second_nbors
+        or is_address_2_tokens_to_left_first_nbors
         or is_address_3_tokens_to_left
         or is_address_4_tokens_to_left
     )
-    if is_address:
+    if is_address_from_NUM:
         print(f"ent: {ent}   ent.label_: {ent.label_}")
         print(f"first_token.nbor(-1) {first_token.nbor(-1).lower_}")
         print(f"first_token.nbor(-2) {first_token.nbor(-2).lower_}")
         print(f"first_token.nbor(-3) {first_token.nbor(-3).lower_}")
         print(f"first_token.nbor(-4) {first_token.nbor(-4).lower_}")
-    return (ent.label_ in ["PER"] and (
-        is_address_1_tokens_to_left
-        or is_address_2_tokens_to_left
-        or last_token.like_num
-        or last_token.nbor().like_num
-    ) or is_address)
+
+    return is_address_from_PER or is_address_from_NUM
 
 
 def get_aditional_left_tokens_for_address(ent):
+    if ent.label_ in ["PER"] and ent[-1].nbor().like_num:
+        return 1
     if ent.label_ in ["NUM"]:
         token = ent[0]
         if token.nbor(-1).lower_ in address_first_left_nbors:
@@ -363,36 +368,28 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
 
             if not is_from_first_tokens(ent.start) and is_address(ent):
-                #FIXME se pueden unificar los token adicionales?
-                token_adicional = 1 if ent[-1].nbor().like_num else 0
                 address_token = get_aditional_left_tokens_for_address(ent)
-                #print(f"ent: {ent} - address_token {address_token}")
-                if address_token > 1:
-                  new_ent_start = ent.start - address_token #+ 1
+                new_ent_start = ent.start - address_token
 
-                  #TODO se podría usar remove_wrong_labeled_entity_span() que está en el branch de mejora_patente
-                  span_to_remove_index = None
-                  for i, new_ent in enumerate(new_ents):
+                ent_to_remove = None
+                for i, new_ent in enumerate(new_ents):
                     if new_ent_start >= new_ent.start and new_ent_start <= new_ent.end or ent.end >= new_ent.start and ent.end <= new_ent.end:
-                      span_to_remove_index = i
-                      break
+                        ent_to_remove = new_ent
+                        break
 
-                  if span_to_remove_index:
-                    #print(f"ANTES new_ents {new_ents}")
-                    filtered = new_ents.pop(span_to_remove_index)
-                    #print(f"DESP POP new_ents {new_ents}")
+                if ent_to_remove:
+                    new_ents = remove_wrong_labeled_entity_span(new_ents, ent_to_remove)
                     #print(f"ent.end - new_ent_start = {ent.end - new_ent_start}")
                     #print(f"filtered.end - filtered.start = {filtered.end - filtered.start}")
-                    if (ent.end - new_ent_start) > (filtered.end - filtered.start):
-                      new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
+                    if (ent.end - new_ent_start) > (ent_to_remove.end - ent_to_remove.start):
+                        print(f"agregoooo una nueva")
+                        new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
                     else:
-                      new_ents.append(filtered)
-                    #print(f"DESPUES new_ents {new_ents}")
-                  else:
-                    new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
-                    #print(f"DESPUES new_ents {new_ents}")
+                        print(f"agregoooo la ent_to_remove")
+                        #TODO debería encontrar cuando pasa por acá, cuando detecta algo que borró pero tiene que volver a agregar?
+                        new_ents.append(ent_to_remove)
                 else:
-                  new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+                    new_ents.append(Span(doc, new_ent_start, ent.end, label="DIRECCIÓN"))
                 
             #if not is_from_first_tokens(ent.start) and is_numeric_address(ent):
             #    new_ents.append(Span(doc, ent.start - 1, ent.end, label="DIRECCIÓN"))                
