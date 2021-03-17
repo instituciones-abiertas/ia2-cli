@@ -14,7 +14,7 @@ from pipeline_components.entity_matcher import (
 from pipeline_components.entity_ruler import ruler_patterns
 from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
-from test.support.env_case import setup_model
+from test.support.env_case import ModelSetup
 
 import itertools
 import spacy
@@ -24,10 +24,8 @@ import unittest
 class EntityCustomTest(unittest.TestCase):
     def setUp(self):
         # Loads a Spacy model
-        nlp = setup_model()
-        entity_custom = EntityCustom(nlp)
-        nlp.add_pipe(entity_custom)
-        self.nlp = nlp
+        pipeline = ["entity_ruler", "entity_matcher", "entity_custom"]
+        self.nlp = ModelSetup(pipeline)
 
     def test_a_custom_entity_pipeline_detects_periods(self):
         base_test_senteces = [
