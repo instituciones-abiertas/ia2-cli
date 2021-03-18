@@ -1,6 +1,7 @@
 from spacy.tokens import Span
 from spacy.util import filter_spans
 import re
+from functools import partial
 
 period_rules = [
     "segundo",
@@ -83,8 +84,11 @@ def is_last(token_id, doc):
     return token_id == len(doc) - 1
 
 
-def is_from_first_tokens(token_id):
-    return token_id <= 2
+def is_between_tokens(token_id, left=0, right=0):
+    return token_id < right and token_id >= left
+
+
+is_from_first_tokens = partial(is_between_tokens, left=0, right=3)
 
 
 def is_judge(ent):
@@ -334,6 +338,7 @@ class EntityCustom(object):
         self.nlp = nlp
 
     def __call__(self, doc):
+        find_fecha_resolucion = False
         new_ents = []
         for token in doc:
             if not is_last(token.i, doc) and is_age(token, token.nbor(1), token.sent):
@@ -346,7 +351,11 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
-        for ent in doc.ents:
+        for i, ent in enumerate(doc.ents):
+            # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
+            if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
+                find_fecha_resolucion = True
+                new_ents.append(Span(doc, ent.start, ent.end, label="FECHA_RESOLUCION"))
             if not is_from_first_tokens(ent.start) and is_law(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
             if not is_last(ent.start, doc) and is_period(ent):

@@ -25,6 +25,7 @@ A la información detectada mediante el aprendizaje automático del modelo, se a
 |FECHA|fecha escrita|Que el día **3 de julio** del corriente año|[Combinaciones soportadas](pipeline_components/entity_ruler.py#L399)| Ruler |
 |FECHA_HECHO|fecha de cuando sucedió el hecho|Solo identificable por intervención de personas| | Etiquetado Manual |
 |FECHA_NÚMERICA|fecha en números|Que el **03/07/2021** la situación sea aclarada|[Formatos soportados](pipeline_components/entity_ruler.py#L380)| Ruler |
+|FECHA_RESOLUCION|fecha escrita|Buenos Aires, **3 de julio del 2020**|Primera fecha que aparece (primeros tokens, o entre las 1eras entidades si antes hay loc o cuij)| Custom |
 |FISCAL|nombre de fiscal nombrado en la causa|Fiscal: **Maria Gonzalez**|*Fiscal* o *fiscalía* antes de identificación como *PER* | Custom |
 |JUEZX|nombre de juez/jueza nombradx en la causa|Juez: **Luis Gonzalez**| *Juez* antes de identificación como *PER*| Custom |
 |DEFENSORX|nombre de defensor/a nombrado en la causa|Defensora: **Maria Gonzalez**|*Defensor* o *Defensora* antes de  identificación como *PER* | Custom |
