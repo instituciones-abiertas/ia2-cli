@@ -111,7 +111,7 @@ class EntityCustomTest(unittest.TestCase):
                 "AAA 410",
                 23,
                 25,
-                "Tal situación tuvo lugar, en circunstancias en que ambos se encontraban en el interior del vehículo marca Renault Trafic, {license_plate_nbor} colocado {license_plate}."
+                "Tal situación tuvo lugar, en circunstancias en que ambos se encontraban en el interior del vehículo marca Renault Trafic, {license_plate_nbor} colocado {license_plate}.",
             ),
             (
                 "AC 154 BC",
@@ -135,7 +135,9 @@ class EntityCustomTest(unittest.TestCase):
 
         for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
             for nbor_word in license_plate_left_nbor:
-                test_sentence = base_test_sentece_text.format(license_plate_nbor=nbor_word, license_plate=target_span_text)
+                test_sentence = base_test_sentece_text.format(
+                    license_plate_nbor=nbor_word, license_plate=target_span_text
+                )
                 doc = self.nlp(test_sentence)
                 # Checks that the text is tokenized the way we expect, so that we
                 # can correctly pick up a span with text "{nbor} AAA 410"
@@ -150,7 +152,7 @@ class EntityCustomTest(unittest.TestCase):
                 "174bis",
                 27,
                 28,
-                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP)."
+                "En lo demás, resolví estar a las medidas cautelares impuestas en sede Civil en los términos de la Ley 26485 en protección de la víctima ({article_marked_as_license_plate} CPP).",
             ),
         ]
 
@@ -163,6 +165,37 @@ class EntityCustomTest(unittest.TestCase):
             self.assertEqual(expected_span.text, target_span_text)
             # Asserts a ART span exists in the document entities
             self.assertNotIn(expected_span, doc.ents)
+
+    def test_a_custom_entity_pipeline_detext_fecha_resolucion(self):
+        # 1) La primera fecha que encuentra si esta dentro de los primeros 100 tokens entonces lo transforma a FECHA_RESOLUCION
+        # 2) Si hay más de una fecha, la segunda fecha no tiene que ser FECHA_RESOLUCION, sino que es FECHA
+        # 3) Igual a 1 pero no al inicio
+        # 4) Si se detecta luego de los 100 tokens no es una FECHA_RESOLUCION, sino que es una FECHA
+        fecha = "9 de julio de 2020"
+        base_test_senteces = [
+            (3, 8, "Buenos Aires, {fecha}", "FECHA_RESOLUCION"),
+            (9, 14, "Buenos Aires, {fecha} y {fecha}", "FECHA"),
+            (
+                63,
+                68,
+                "RESOLUCION INTERLOCUTORIA \n No hace lugar a pedido de allanamiento y requisa personal por carácter prematuro de la medida (art. 108 y 112 CPPCABA; arts. 18 y 75 inc. 22 CN; art. 9 DADDH; art. 12 DUDH; art. 112 CADH; 138 y 123 CCABA).,\n Buenos Aires, {fecha}",
+                "FECHA_RESOLUCION",
+            ),
+            (
+                123,
+                128,
+                "RESOLUCION INTERLOCUTORIA \n No hace lugar a pedido de allanamiento y requisa personal por carácter prematuro de la medida (art. 108 y 112 CPPCABA; arts. 18 y 75 inc. 22 CN; art. 9 DADDH; art. 12 DUDH; art. 112 CADH; 138 y 123 CCABA).,\n RESOLUCION INTERLOCUTORIA \n No hace lugar a pedido de allanamiento y requisa personal por carácter prematuro de la medida (art. 108 y 112 CPPCABA; arts. 18 y 75 inc. 22 CN; art. 9 DADDH; art. 12 DUDH; art. 112 CADH; 138 y 123 CCABA).,\n Buenos Aires, {fecha}",
+                "FECHA",
+            ),
+        ]
+
+        for start, end, sentence, label in base_test_senteces:
+            test_sentence = sentence.format(fecha=fecha)
+            doc = self.nlp(test_sentence)
+            expected_span = Span(doc, start, end, label=label)
+            self.assertEqual(expected_span.text, fecha)
+            self.assertIn(expected_span, doc.ents)
+
 
 if __name__ == "__main__":
     unittest.main()
