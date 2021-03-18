@@ -37,6 +37,8 @@ address_second_left_nbors = [
     "ubicado", "registrado", "ubicada", "real"
 ]
 
+address_connector = "en"
+
 license_plate_left_nbor = [
     "patente",
     "dominio",
@@ -199,14 +201,17 @@ def is_token_in_x_left_pos(token, pos, nbors):
     except:
         return False
 
+
 def is_address(ent):
     first_token = ent[0]
     last_token = ent[-1]
     address_1_tokens_to_left = is_token_in_x_left_pos(first_token, 1, address_first_left_nbors)
     address_2_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 2, address_first_left_nbors)
     address_2_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 2, address_second_left_nbors)
-    address_3_tokens_to_left = is_token_in_x_left_pos(first_token, 3, address_first_left_nbors)
-    address_4_tokens_to_left = is_token_in_x_left_pos(first_token, 4, address_first_left_nbors)
+    address_3_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 3, address_first_left_nbors)
+    address_3_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 3, address_second_left_nbors)
+    address_4_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 4, address_first_left_nbors)
+    address_4_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 4, address_second_left_nbors)
 
     is_address_from_PER = ent.label_ in ["PER"] and (
         address_1_tokens_to_left
@@ -217,19 +222,13 @@ def is_address(ent):
 
     is_address_from_NUM = ent.label_ in ["NUM"] and (
         address_1_tokens_to_left
-        or address_2_tokens_to_left_second_nbors
         or address_2_tokens_to_left_first_nbors
-        or address_3_tokens_to_left
-        or address_4_tokens_to_left
+        or address_2_tokens_to_left_second_nbors
+        or address_3_tokens_to_left_first_nbors
+        or address_3_tokens_to_left_second_nbors
+        or address_4_tokens_to_left_first_nbors
+        or address_4_tokens_to_left_second_nbors
     )
-
-    #TODO remove after testing this
-    # if is_address_from_NUM:
-        # print(f"ent: {ent}   ent.label_: {ent.label_}")
-        # print(f"first_token.nbor(-1) {first_token.nbor(-1).lower_}")
-        # print(f"first_token.nbor(-2) {first_token.nbor(-2).lower_}")
-        # print(f"first_token.nbor(-3) {first_token.nbor(-3).lower_}")
-        # print(f"first_token.nbor(-4) {first_token.nbor(-4).lower_}")
 
     return is_address_from_PER or is_address_from_NUM
 
@@ -241,13 +240,18 @@ def get_aditional_left_tokens_for_address(ent):
         token = ent[0]
         if token.nbor(-1).lower_ in address_first_left_nbors:
             return 1
-        if token.nbor(-2).lower_ in address_second_left_nbors or token.nbor(-2).lower_ in address_first_left_nbors:
+        if token.nbor(-2).lower_ in address_first_left_nbors or token.nbor(-2).lower_ in address_second_left_nbors:
             return 2
         if token.nbor(-3).lower_ in address_first_left_nbors:
             return 3
+        if token.nbor(-3).lower_ in address_second_left_nbors:
+            return 2 - 1 if token.nbor(-2).lower_ == address_connector else 0
         if token.nbor(-4).lower_ in address_first_left_nbors:
             return 4
+        if token.nbor(-4).lower_ in address_second_left_nbors:
+            return 3 - 1 if token.nbor(-3).lower_ == address_connector else 0
     return 0
+
 
 def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
     for i, ent_from_list in enumerate(list_entities):
@@ -255,13 +259,12 @@ def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
             return ent_from_list
     return None
 
+
 def generate_address_span(ent, new_ents, doc):
     address_token = get_aditional_left_tokens_for_address(ent)
     ent_start = ent.start - address_token
     ent_to_remove = get_entity_to_remove_if_contained_by(ent_start, ent.end, new_ents)
-
     if ent_to_remove:
-        print(f"ent_to_remove {ent_to_remove}")
         if (ent.end - ent_start) > (ent_to_remove.end - ent_to_remove.start):
             new_ents = remove_wrong_labeled_entity_span(new_ents, ent_to_remove)
             return Span(doc, ent_start, ent.end, label="DIRECCIÓN")
