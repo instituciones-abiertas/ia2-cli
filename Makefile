@@ -9,7 +9,7 @@ help:
 
 #test: @ Run all tests
 test:
-	source .env && python -m unittest discover -p "test_*.py"
+	source .env && python -m unittest discover -v -p "test_*.py"
 
 #lint: @ Run flake8 linter (does not format code)
 lint:
