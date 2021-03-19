@@ -33,7 +33,12 @@ from callbacks import (
 
 from spacy.pipeline import EntityRuler
 from pipeline_components.entity_ruler import ruler_patterns
-from pipeline_components.entity_matcher import ArticlesMatcher, EntityMatcher, matcher_patterns
+from pipeline_components.entity_matcher import (
+    ArticlesMatcher,
+    EntityMatcher,
+    ViolenceContextMatcher,
+    matcher_patterns,
+)
 from pipeline_components.entity_custom import EntityCustom
 
 logger = logging.getLogger("Spacy cli util")
@@ -694,7 +699,10 @@ class SpacyUtils:
         nlp.add_pipe(ruler)
 
         article_matcher = ArticlesMatcher(nlp)
-        entity_matcher = EntityMatcher(nlp, matcher_patterns, after_callbacks=[article_matcher])
+        violence_contexts_matcher = ViolenceContextMatcher(nlp)
+        entity_matcher = EntityMatcher(
+            nlp, matcher_patterns, after_callbacks=[article_matcher, violence_contexts_matcher]
+        )
         nlp.add_pipe(entity_matcher)
 
         entity_custom = EntityCustom(nlp)
@@ -735,7 +743,7 @@ dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
 
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[moduloMatcher.ArticlesMatcher(nlp), moduloMatcher.ViolenceContextMatcher(nlp)])
 Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
 """
 
