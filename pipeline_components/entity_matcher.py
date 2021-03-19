@@ -1,3 +1,4 @@
+import logging
 from pipeline_components.generic_matcher import GenericMatcher, repeat_patterns
 from spacy.matcher import Matcher
 from spacy.tokens import Span
@@ -180,7 +181,7 @@ class EntityMatcher(object):
                 # FIXME this one ent has been discarded by the nbor word lists.
                 # We should consider assigning them to an entity, or filter them
                 # somewhere else
-                print(f"[FIXME] Should process this span as another ent: `{span}`")
+                logging.info(f"[FIXME] Should process this span as another ent: `{span}`")
 
         for after_callback in self.after_callbacks:
             doc = after_callback(doc)
