@@ -27,6 +27,19 @@ law_left_nbors = [
     "leyes",
 ]
 
+address_first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
+                    "avenida", "av.", "Avenida", "Av.", 
+                    "pasaje", "Pasaje", "Parcela", "parcela"]
+                    
+address_second_left_nbors = [
+    "instalación", "contramano", "sita", "sitas", "sito", "sitos",
+    "real", "domiciliado", "domiciliada", "constituido",
+    "constituida", "contramano", "intersección", "domicilio",
+    "ubicado", "registrado", "ubicada", "real"
+]
+
+address_connector = "en"
+
 license_plate_left_nbor = [
     "patente",
     "dominio",
@@ -185,40 +198,85 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
+#TODO this function could be used in many methods, check it!
+def is_token_in_x_left_pos(token, pos, nbors):
+    try:
+        return token.nbor(-pos).lower_ in nbors
+    except:
+        return False
+
 
 def is_address(ent):
-    first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
-    second_left_nbors = [
-        "instalación",
-        "sita",
-        "sitas",
-        "sito",
-        "sitos",
-        "real",
-        "domiciliado",
-        "domiciliada",
-        "constituido",
-        "constituida",
-        "contramano",
-        "intersección",
-        "domicilio",
-        "ubicado",
-        "ubicada",
-        "real",
-    ]
     first_token = ent[0]
     last_token = ent[-1]
+    address_1_tokens_to_left = is_token_in_x_left_pos(first_token, 1, address_first_left_nbors)
+    address_2_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 2, address_first_left_nbors)
+    address_2_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 2, address_second_left_nbors)
+    address_3_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 3, address_first_left_nbors)
+    address_3_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 3, address_second_left_nbors)
+    address_4_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 4, address_first_left_nbors)
+    address_4_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 4, address_second_left_nbors)
 
-    return ent.label_ in ["PER"] and (
-        first_token.nbor(-1).lower_ in first_left_nbors
-        or first_token.nbor(-2).lower_ in second_left_nbors
+    is_address_from_PER = ent.label_ in ["PER"] and (
+        address_1_tokens_to_left
+        or address_2_tokens_to_left_second_nbors
         or last_token.like_num
         or last_token.nbor().like_num
     )
 
+    is_address_from_NUM = ent.label_ in ["NUM"] and (
+        address_1_tokens_to_left
+        or address_2_tokens_to_left_first_nbors
+        or address_2_tokens_to_left_second_nbors
+        or address_3_tokens_to_left_first_nbors
+        or address_3_tokens_to_left_second_nbors
+        or address_4_tokens_to_left_first_nbors
+        or address_4_tokens_to_left_second_nbors
+    )
+
+    return is_address_from_PER or is_address_from_NUM
+
+
+def get_aditional_left_tokens_for_address(ent):
+    if ent.label_ in ["PER"] and ent[-1].nbor().like_num:
+        return 1
+    if ent.label_ in ["NUM"]:
+        token = ent[0]
+        if token.nbor(-1).lower_ in address_first_left_nbors:
+            return 1
+        if token.nbor(-2).lower_ in address_first_left_nbors or token.nbor(-2).lower_ in address_second_left_nbors:
+            return 2
+        if token.nbor(-3).lower_ in address_first_left_nbors:
+            return 3
+        if token.nbor(-3).lower_ in address_second_left_nbors:
+            return 2 - 1 if token.nbor(-2).lower_ == address_connector else 0
+        if token.nbor(-4).lower_ in address_first_left_nbors:
+            return 4
+        if token.nbor(-4).lower_ in address_second_left_nbors:
+            return 3 - 1 if token.nbor(-3).lower_ == address_connector else 0
+    return 0
+
+
+def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
+    for i, ent_from_list in enumerate(list_entities):
+        if ent_start >= ent_from_list.start and ent_start <= ent_from_list.end or ent_end >= ent_from_list.start and ent_end <= ent_from_list.end:
+            return ent_from_list
+    return None
+
+
+def generate_address_span(ent, new_ents, doc):
+    address_token = get_aditional_left_tokens_for_address(ent)
+    ent_start = ent.start - address_token
+    ent_to_remove = get_entity_to_remove_if_contained_by(ent_start, ent.end, new_ents)
+    if ent_to_remove:
+        if (ent.end - ent_start) > (ent_to_remove.end - ent_to_remove.start):
+            new_ents = remove_wrong_labeled_entity_span(new_ents, ent_to_remove)
+            return Span(doc, ent_start, ent.end, label="DIRECCIÓN")
+
+    return Span(doc, ent_start, ent.end, label="DIRECCIÓN")
+
 
 def could_be_an_article(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -235,7 +293,6 @@ def could_be_an_article(ent):
 
 
 def is_license_plate(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -249,7 +306,6 @@ def is_license_plate(ent):
 
 
 def get_start_end_license_plate(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     first_right_token = token.nbor(1).lower_
@@ -315,8 +371,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
             if not is_from_first_tokens(ent.start) and is_address(ent):
-                token_adicional = 1 if ent[-1].nbor().like_num else 0
-                new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+                new_ents.append(generate_address_span(ent, new_ents, doc))
             if not is_from_first_tokens(ent.start) and is_ip_address(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
             if not is_from_first_tokens(ent.start) and is_phone(ent):
