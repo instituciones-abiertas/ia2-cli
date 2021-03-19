@@ -743,7 +743,7 @@ dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
 
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[moduloMatcher.ArticlesMatcher(nlp), moduloMatcher.ViolenceContextMatcher(nlp)])
 Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
 """
 
