@@ -681,7 +681,9 @@ class SpacyUtils:
         self, model_path: str, package_path: str, model_name: str, model_version: str, model_components: str
     ):
         """
-        Add rules updating the model to the given path and package model
+        Given a model path, a dist path, a model name, a version number and a
+        directory to pipelines, adds those pipelines to the given model, assigns
+        a name to it and build a python package in the dist directory.
 
         :param model_path: A model path
         :param package_path: A package path
