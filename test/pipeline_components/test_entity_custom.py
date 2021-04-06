@@ -4,14 +4,16 @@ from pipeline_components.entity_custom import (
     period_rules,
     license_plate_left_nbor,
     address_first_left_nbors,
-    address_second_left_nbors,    
+    address_second_left_nbors,
+    age_right_token,
+    age_text_in_token,    
 )
 from pipeline_components.entity_matcher import (
     EntityMatcher,
     matcher_patterns,
-    first_left_nbors,
-    second_left_nbors,
-    first_right_nbors,
+    page_first_left_nbors,
+    page_second_left_nbors,
+    measure_unit_first_right_nbors,
 )
 from pipeline_components.entity_ruler import ruler_patterns
 from spacy.pipeline import EntityRuler
@@ -241,7 +243,7 @@ class EntityCustomTest(unittest.TestCase):
                 # print(f"doc.ents {doc.ents}")
                 self.assertIn(expected_span, doc.ents)
 
-                
+
     def test_a_custom_entity_pipeline_detext_fecha_resolucion(self):
         # 1) La primera fecha que encuentra si esta dentro de los primeros 100 tokens entonces lo transforma a FECHA_RESOLUCION
         # 2) Si hay más de una fecha, la segunda fecha no tiene que ser FECHA_RESOLUCION, sino que es FECHA
@@ -271,6 +273,59 @@ class EntityCustomTest(unittest.TestCase):
             expected_span = Span(doc, start, end, label=label)
             self.assertEqual(expected_span.text, fecha)
             self.assertIn(expected_span, doc.ents)
+
+
+    def test_a_custom_entity_pipeline_detects_age(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_case_number(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_cuij_number(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_actuacion_number(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_expediente_number(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_judge(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_secretary(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_prosecutor(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_ombuds_person(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_accused(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_advisor(self):
+        print("TODO: not implemented")
+        pass    
+
+    def test_a_custom_entity_pipeline_detects_ip_address(self):
+        print("TODO: not implemented")
+        pass
+
+    def test_a_custom_entity_pipeline_detects_phone(self):
+        print("TODO: not implemented")
+        pass
 
 
 if __name__ == "__main__":

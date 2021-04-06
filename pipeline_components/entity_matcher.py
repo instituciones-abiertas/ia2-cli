@@ -4,6 +4,77 @@ from spacy.tokens import Span
 from spacy.lang.es.lex_attrs import _num_words
 from spacy.util import filter_spans
 
+# Extends built-in lex_attrs from the spanish lang package
+num_words = _num_words + [
+    "ciento",
+    "docientas",
+    "docientos",
+    "doscientas",
+    "doscientos",
+    "trecientas",
+    "trecientos",
+    "trescientas",
+    "trescientos",
+    "cuatrocientas",
+    "cuatrocientos",
+    "quinientas",
+    "quinientos",
+    "seiscientas",
+    "seiscientos",
+    "setecientas",
+    "setecientos",
+    "ochocientas",
+    "ochocientos",
+    "novecientas",
+    "novecientos",
+    "millones",
+    "billones",
+    "trillones",
+]
+page_first_left_nbors = [
+    "página",
+    "pag",
+    "p",
+    "p.",
+    "pág",
+    "pág.",
+    "fs",
+    "inciso",
+    "inc",
+]
+page_second_left_nbors = [
+    "página",
+    "pag",
+    "fs",
+    "inciso",
+    "inc",
+]
+measure_unit_first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
+
+article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
+
+#Violence
+gender_violence_context_text = "CONTEXTO_VIOLENCIA_DE_GÉNERO"
+violence_context_text = "CONTEXTO_VIOLENCIA"
+violence_nbors = ["violencia", "violencias"]
+violence_types = [
+    "ambiental",
+    "doméstica",
+    "domestica",
+    "económica",
+    "economica",
+    "física",
+    "fisica",
+    "patrimonial",
+    "psicológica",
+    "psicologica",
+    "sexual",
+    "simbólica",
+    "simbolica",
+    "social",
+]
+gender_violence_types = ["género", "genero"]
+
 
 def filter_longer_spans(spans, *, seen_tokens=set(), preserve_spans=[]):
     """Filter a sequence of spans and remove duplicates or overlaps. Useful for
@@ -71,55 +142,6 @@ class GenericMatcher(object):
         # Merges adjacent entities and removes overlapped entities
         doc.ents = filter_longer_spans(doc_ents, seen_tokens=seen_tokens, preserve_spans=merged_matched_spans)
         return doc
-
-
-# Extends built-in lex_attrs from the spanish lang package
-num_words = _num_words + [
-    "ciento",
-    "docientas",
-    "docientos",
-    "doscientas",
-    "doscientos",
-    "trecientas",
-    "trecientos",
-    "trescientas",
-    "trescientos",
-    "cuatrocientas",
-    "cuatrocientos",
-    "quinientas",
-    "quinientos",
-    "seiscientas",
-    "seiscientos",
-    "setecientas",
-    "setecientos",
-    "ochocientas",
-    "ochocientos",
-    "novecientas",
-    "novecientos",
-    "millones",
-    "billones",
-    "trillones",
-]
-
-first_left_nbors = [
-    "página",
-    "pag",
-    "p",
-    "p.",
-    "pág",
-    "pág.",
-    "fs",
-    "inciso",
-    "inc",
-]
-second_left_nbors = [
-    "página",
-    "pag",
-    "fs",
-    "inciso",
-    "inc",
-]
-first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
 
 
 def exist_n_token(token_index, nbor_position, document_length):
@@ -223,7 +245,7 @@ class EntityMatcher(object):
                     document_length,
                     span,
                     "NUM",
-                    first_left_nbors,
+                    page_first_left_nbors,
                     -1,
                 )
 
@@ -232,12 +254,12 @@ class EntityMatcher(object):
                     document_length,
                     span,
                     "NUM",
-                    second_left_nbors,
+                    page_second_left_nbors,
                     -2,
                 )
 
             def does_not_have_first_right_nbor(document_length, span):
-                return not_in_nbor(document_length, span, "NUM", first_right_nbors, 1)
+                return not_in_nbor(document_length, span, "NUM", measure_unit_first_right_nbors, 1)
 
             if (
                 does_not_have_first_left_nbor(document_length, span)
@@ -255,9 +277,6 @@ class EntityMatcher(object):
             doc = after_callback(doc)
 
         return doc
-
-
-article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
 
 
 class ArticlesMatcher(object):
@@ -286,28 +305,6 @@ class ArticlesMatcher(object):
         ]
 
 
-violence_nbors = ["violencia", "violencias"]
-
-violence_types = [
-    "ambiental",
-    "doméstica",
-    "domestica",
-    "económica",
-    "economica",
-    "física",
-    "fisica",
-    "patrimonial",
-    "psicológica",
-    "psicologica",
-    "sexual",
-    "simbólica",
-    "simbolica",
-    "social",
-]
-
-gender_violence_types = ["género", "genero"]
-
-
 class ViolenceContextMatcher(object):
     name = "violence_context_matcher"
 
@@ -321,7 +318,7 @@ class ViolenceContextMatcher(object):
     def get_violence_context_patterns(self):
         return [
             (
-                "CONTEXTO_VIOLENCIA_DE_GÉNERO",
+                gender_violence_context_text,
                 [
                     {"LOWER": {"IN": violence_nbors}},
                     {"IS_PUNCT": True, "OP": "?"},
@@ -330,7 +327,7 @@ class ViolenceContextMatcher(object):
                 ],
             ),
             (
-                "CONTEXTO_VIOLENCIA",
+                violence_context_text,
                 [
                     {"LOWER": {"IN": violence_nbors}},
                     {"IS_PUNCT": True, "OP": "?"},
@@ -338,7 +335,7 @@ class ViolenceContextMatcher(object):
                 ],
             ),
             (
-                "CONTEXTO_VIOLENCIA",
+                violence_context_text,
                 [
                     {"LOWER": {"IN": violence_nbors}},
                     {"IS_PUNCT": True, "OP": "?"},
