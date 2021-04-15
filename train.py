@@ -33,7 +33,12 @@ from callbacks import (
 
 from spacy.pipeline import EntityRuler
 from pipeline_components.entity_ruler import ruler_patterns
-from pipeline_components.entity_matcher import ArticlesMatcher, EntityMatcher, matcher_patterns
+from pipeline_components.entity_matcher import (
+    ArticlesMatcher,
+    EntityMatcher,
+    ViolenceContextMatcher,
+    matcher_patterns,
+)
 from pipeline_components.entity_custom import EntityCustom
 
 logger = logging.getLogger("Spacy cli util")
@@ -97,7 +102,6 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     except Exception as e:
         logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
-
 
 class SpacyUtils:
     """
@@ -319,11 +323,13 @@ class SpacyUtils:
                 # compute validation scores
                 val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
                 if settings["evaluate"] == "val":
+                    logger.info("Evaluating docs from validation data")
                     val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
                         optimizer, nlp, val_texts, val_annotations
                     )
 
                 # train data score
+                logger.info("Evaluating docs from training data")                
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
                     optimizer, nlp, tr_texts, tr_annotations
                 )
@@ -359,6 +365,7 @@ class SpacyUtils:
             # during the train loop. We also want to get scores on test data
             # for each one of this models.
             if settings["evaluate"] == "test" and state["evaluate_test"]:
+                logger.info("Evaluating docs from testing data")                
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
                     optimizer, nlp, test_texts, test_annotations
                 )
@@ -635,10 +642,12 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
+            alignment_values = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
+            is_missaligned_doc = True if '-' in alignment_values else False
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
-            return scorer.scores
+            return scorer.scores, is_missaligned_doc
         except Exception as e:
             print(e)
 
@@ -646,12 +655,14 @@ class SpacyUtils:
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
+        missaligned_docs = 0
         ents_per_type_sum = {}
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
-                scores = self.evaluate(nlp, text, entities_for_text)
+                scores, is_missaligned_doc = self.evaluate(nlp, text, entities_for_text)
+                missaligned_docs += 1 if is_missaligned_doc else 0
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
@@ -662,6 +673,7 @@ class SpacyUtils:
                     else:
                         ents_per_type_sum[key] += value["f"]
 
+        logger.info(f'Missaligned docs for ⤴️: {missaligned_docs}/{len(texts)} ({round(100*missaligned_docs/len(texts),2)}%).')
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
 
@@ -676,7 +688,9 @@ class SpacyUtils:
         self, model_path: str, package_path: str, model_name: str, model_version: str, model_components: str
     ):
         """
-        Add rules updating the model to the given path and package model
+        Given a model path, a dist path, a model name, a version number and a
+        directory to pipelines, adds those pipelines to the given model, assigns
+        a name to it and build a python package in the dist directory.
 
         :param model_path: A model path
         :param package_path: A package path
@@ -694,7 +708,10 @@ class SpacyUtils:
         nlp.add_pipe(ruler)
 
         article_matcher = ArticlesMatcher(nlp)
-        entity_matcher = EntityMatcher(nlp, matcher_patterns, after_callbacks=[article_matcher])
+        violence_contexts_matcher = ViolenceContextMatcher(nlp)
+        entity_matcher = EntityMatcher(
+            nlp, matcher_patterns, after_callbacks=[article_matcher, violence_contexts_matcher]
+        )
         nlp.add_pipe(entity_matcher)
 
         entity_custom = EntityCustom(nlp)
@@ -712,7 +729,7 @@ class SpacyUtils:
 
         # Copio archivos con modulos custom al directorio pipe_components (no uso model_components para que sea fijo y siempre el mismo en nuestro componente, y asi poder desacoplarlo de cuando tengamos multiples clientes
         package_components_dir = "pipeline_components"
-        files_src = ["entity_matcher.py", "entity_custom.py", "generic_matcher.py"]
+        files_src = ["entity_matcher.py", "entity_custom.py"]
         dest_component_dir = os.path.join(package_base_path, package_dir, package_components_dir)
         os.mkdir(dest_component_dir)
         for f in files_src:
@@ -735,7 +752,7 @@ dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
 
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns,**cfg)
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[moduloMatcher.ArticlesMatcher(nlp), moduloMatcher.ViolenceContextMatcher(nlp)])
 Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
 """
 

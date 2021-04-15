@@ -34,3 +34,5 @@ dist
 
 # Env
 .env
+
+spacy_script.py

@@ -1,6 +1,7 @@
 from spacy.tokens import Span
 from spacy.util import filter_spans
 import re
+from functools import partial
 
 period_rules = [
     "segundo",
@@ -26,35 +27,89 @@ law_left_nbors = [
     "leyes",
 ]
 
+address_first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
+                    "avenida", "av.", "Avenida", "Av.", 
+                    "pasaje", "Pasaje", "Parcela", "parcela"]
+                    
+address_second_left_nbors = [
+    "instalación", "contramano", "sita", "sitas", "sito", "sitos",
+    "real", "domiciliado", "domiciliada", "constituido",
+    "constituida", "contramano", "intersección", "domicilio",
+    "ubicado", "registrado", "ubicada", "real"
+]
+
+address_connector = "en"
+
 license_plate_left_nbor = [
     "patente",
     "dominio",
 ]
 
+age_right_token = "años"
+age_text_in_token = "edad"
+number_abreviated_indicator = "nº"
+case_first_left_token = "caso"
+case_second_left_token = "causa"
+cuij_indicator = "cuij"
+actuacion_number_indicator = "nro"
+actuacion_nbor_token = "actuación"
+expediente_indicator = "expediente"
+
+judge_lemma = ["juez", "jueza", "Juez", "Jueza"]
+secretarix_lemma = [
+    "secretario",
+    "secretaria",
+    "prosecretario",
+    "prosecretaria",
+    "Prosecretario",
+    "Prosecretaria",
+    "Secretario",
+    "Secretaria",
+]
+prosecutor_lemma = ["fiscal", "fiscalía", "Fiscal", "Fiscalía"]
+ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
+accused_lemma = [
+    "acusado",
+    "acusada",
+    "imputado",
+    "imputada",
+    "infractor",
+    "infractora",
+    "Acusado",
+    "Acusada",
+    "Imputado",
+    "Imputada",
+    "Infractor",
+    "Infractora",
+]
+advisor_lemma = ["asesor", "asesora", "Asesor", "Asesora"]
+phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico"]
+phone_text = ["telefono", "tel", "cel"]
+
 
 def is_age(token, right_token, token_sent):
-    return token.like_num and right_token.text == "años" and "edad" in token_sent.text
+    return token.like_num and right_token.text == age_right_token and age_text_in_token in token_sent.text
 
 
 def is_caseNumber(token, first_left_token, second_left_token, token_sent):
     return token.like_num and (
-        (first_left_token.lower_ == "nº" and second_left_token.lower_ == "causa") or first_left_token.lower_ == "caso"
+        (first_left_token.lower_ == number_abreviated_indicator and second_left_token.lower_ == case_second_left_token) or first_left_token.lower_ == case_first_left_token
     )
 
 
 def is_cuijNumber(token):
-    return (token.is_ascii and token.nbor(-3).lower_ == "cuij") or (token.like_num and token.nbor(-3).lower_ == "cuij")
+    return (token.is_ascii and token.nbor(-3).lower_ == cuij_indicator) or (token.like_num and token.nbor(-3).lower_ == cuij_indicator)
 
 
 def is_actuacionNumber(token):
-    return token.nbor(-1).lower_ == ":" and token.nbor(-2).lower_ == "nro" and token.nbor(-3).lower_ == "actuación"
+    return token.nbor(-1).lower_ == ":" and token.nbor(-2).lower_ == actuacion_number_indicator and token.nbor(-3).lower_ == actuacion_nbor_token
 
 
 def is_expedienteNumber(token):
     return (
-        token.nbor(-1).lower_ == "nº"
-        and (token.nbor(-3).lower_ == "expediente" or token.nbor(-2).lower_ == "expediente")
-    ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
+        token.nbor(-1).lower_ == number_abreviated_indicator
+        and (token.nbor(-3).lower_ == expediente_indicator or token.nbor(-2).lower_ == expediente_indicator)
+    ) or (token.like_num and token.nbor(-2).lower_ == expediente_indicator)
 
 
 def is_place_token(token):
@@ -85,13 +140,15 @@ def is_last(token_id, doc):
     return token_id == len(doc) - 1
 
 
-def is_from_first_tokens(token_id):
-    return token_id <= 2
+def is_between_tokens(token_id, left=0, right=0):
+    return token_id < right and token_id >= left
+
+
+is_from_first_tokens = partial(is_between_tokens, left=0, right=3)
 
 
 def is_judge(ent):
     first_token = ent[0]
-    judge_lemma = ["juez", "jueza", "Juez", "Jueza"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in judge_lemma
         or first_token.nbor(-2).lemma_ in judge_lemma
@@ -106,16 +163,6 @@ def is_period(ent):
 
 def is_secretary(ent):
     first_token = ent[0]
-    secretarix_lemma = [
-        "secretario",
-        "secretaria",
-        "prosecretario",
-        "prosecretaria",
-        "Prosecretario",
-        "Prosecretaria",
-        "Secretario",
-        "Secretaria",
-    ]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in secretarix_lemma
         or first_token.nbor(-2).lemma_ in secretarix_lemma
@@ -125,7 +172,6 @@ def is_secretary(ent):
 
 def is_prosecutor(ent):
     first_token = ent[0]
-    prosecutor_lemma = ["fiscal", "fiscalía", "Fiscal", "Fiscalía"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in prosecutor_lemma
         or first_token.nbor(-2).lemma_ in prosecutor_lemma
@@ -135,7 +181,6 @@ def is_prosecutor(ent):
 
 def is_ombuds_person(ent):
     first_token = ent[0]
-    ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in ombuds_person_lemma
         or first_token.nbor(-2).lemma_ in ombuds_person_lemma
@@ -145,20 +190,6 @@ def is_ombuds_person(ent):
 
 def is_accused(ent):
     first_token = ent[0]
-    accused_lemma = [
-        "acusado",
-        "acusada",
-        "imputado",
-        "imputada",
-        "infractor",
-        "infractora",
-        "Acusado",
-        "Acusada",
-        "Imputado",
-        "Imputada",
-        "Infractor",
-        "Infractora",
-    ]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in accused_lemma
         or first_token.nbor(-2).lemma_ in accused_lemma
@@ -168,7 +199,6 @@ def is_accused(ent):
 
 def is_advisor(ent):
     first_token = ent[0]
-    advisor_lemma = ["asesor", "asesora", "Asesor", "Asesora"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in advisor_lemma
         or first_token.nbor(-2).lemma_ in advisor_lemma
@@ -185,8 +215,6 @@ def is_ip_address(ent):
 
 def is_phone(ent):
     first_token = ent[0]
-    phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico"]
-    phone_text = ["telefono", "tel", "cel"]
     return ent.label_ == "NUM" and (
         first_token.nbor(-1).lemma_ in phone_lemma
         or first_token.nbor(-2).lemma_ in phone_lemma
@@ -196,40 +224,85 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
+#TODO this function could be used in many methods, check it!
+def is_token_in_x_left_pos(token, pos, nbors):
+    try:
+        return token.nbor(-pos).lower_ in nbors
+    except:
+        return False
+
 
 def is_address(ent):
-    first_left_nbors = ["calle", "Calle", "dirección", "Dirección", "hasta"]
-    second_left_nbors = [
-        "instalación",
-        "sita",
-        "sitas",
-        "sito",
-        "sitos",
-        "real",
-        "domiciliado",
-        "domiciliada",
-        "constituido",
-        "constituida",
-        "contramano",
-        "intersección",
-        "domicilio",
-        "ubicado",
-        "ubicada",
-        "real",
-    ]
     first_token = ent[0]
     last_token = ent[-1]
+    address_1_tokens_to_left = is_token_in_x_left_pos(first_token, 1, address_first_left_nbors)
+    address_2_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 2, address_first_left_nbors)
+    address_2_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 2, address_second_left_nbors)
+    address_3_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 3, address_first_left_nbors)
+    address_3_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 3, address_second_left_nbors)
+    address_4_tokens_to_left_first_nbors = is_token_in_x_left_pos(first_token, 4, address_first_left_nbors)
+    address_4_tokens_to_left_second_nbors = is_token_in_x_left_pos(first_token, 4, address_second_left_nbors)
 
-    return ent.label_ in ["PER"] and (
-        first_token.nbor(-1).lower_ in first_left_nbors
-        or first_token.nbor(-2).lower_ in second_left_nbors
+    is_address_from_PER = ent.label_ in ["PER"] and (
+        address_1_tokens_to_left
+        or address_2_tokens_to_left_second_nbors
         or last_token.like_num
         or last_token.nbor().like_num
     )
 
+    is_address_from_NUM = ent.label_ in ["NUM"] and (
+        address_1_tokens_to_left
+        or address_2_tokens_to_left_first_nbors
+        or address_2_tokens_to_left_second_nbors
+        or address_3_tokens_to_left_first_nbors
+        or address_3_tokens_to_left_second_nbors
+        or address_4_tokens_to_left_first_nbors
+        or address_4_tokens_to_left_second_nbors
+    )
+
+    return is_address_from_PER or is_address_from_NUM
+
+
+def get_aditional_left_tokens_for_address(ent):
+    if ent.label_ in ["PER"] and ent[-1].nbor().like_num:
+        return 1
+    if ent.label_ in ["NUM"]:
+        token = ent[0]
+        if token.nbor(-1).lower_ in address_first_left_nbors:
+            return 1
+        if token.nbor(-2).lower_ in address_first_left_nbors or token.nbor(-2).lower_ in address_second_left_nbors:
+            return 2
+        if token.nbor(-3).lower_ in address_first_left_nbors:
+            return 3
+        if token.nbor(-3).lower_ in address_second_left_nbors:
+            return 2 - 1 if token.nbor(-2).lower_ == address_connector else 0
+        if token.nbor(-4).lower_ in address_first_left_nbors:
+            return 4
+        if token.nbor(-4).lower_ in address_second_left_nbors:
+            return 3 - 1 if token.nbor(-3).lower_ == address_connector else 0
+    return 0
+
+
+def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
+    for i, ent_from_list in enumerate(list_entities):
+        if ent_start >= ent_from_list.start and ent_start <= ent_from_list.end or ent_end >= ent_from_list.start and ent_end <= ent_from_list.end:
+            return ent_from_list
+    return None
+
+
+def generate_address_span(ent, new_ents, doc):
+    address_token = get_aditional_left_tokens_for_address(ent)
+    ent_start = ent.start - address_token
+    ent_to_remove = get_entity_to_remove_if_contained_by(ent_start, ent.end, new_ents)
+    if ent_to_remove:
+        if (ent.end - ent_start) > (ent_to_remove.end - ent_to_remove.start):
+            new_ents = remove_wrong_labeled_entity_span(new_ents, ent_to_remove)
+            return Span(doc, ent_start, ent.end, label="DIRECCIÓN")
+
+    return Span(doc, ent_start, ent.end, label="DIRECCIÓN")
+
 
 def could_be_an_article(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -246,7 +319,6 @@ def could_be_an_article(ent):
 
 
 def is_license_plate(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     second_left_token = token.nbor(-2).lower_
@@ -260,7 +332,6 @@ def is_license_plate(ent):
 
 
 def get_start_end_license_plate(ent):
-    # TODO deberíamos centralizar esta extracción de tokens según posición
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
     first_right_token = token.nbor(1).lower_
@@ -293,6 +364,7 @@ class EntityCustom(object):
         self.nlp = nlp
 
     def __call__(self, doc):
+        find_fecha_resolucion = False
         new_ents = []
         for token in doc:
             if not is_last(token.i, doc) and is_age(token, token.nbor(1), token.sent):
@@ -307,7 +379,12 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
             if not is_from_first_tokens(token.i) and is_place_token(token):
                 new_ents.append(Span(doc, token.i - 1, token.i + 1, label="LOC"))
-        for ent in doc.ents:
+
+        for i, ent in enumerate(doc.ents):
+            # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
+            if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
+                find_fecha_resolucion = True
+                new_ents.append(Span(doc, ent.start, ent.end, label="FECHA_RESOLUCION"))
             if not is_from_first_tokens(ent.start) and is_law(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
             if not is_last(ent.start, doc) and is_period(ent):
@@ -323,8 +400,7 @@ class EntityCustom(object):
             if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
                 new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
             if not is_from_first_tokens(ent.start) and is_address(ent):
-                token_adicional = 1 if ent[-1].nbor().like_num else 0
-                new_ents.append(Span(doc, ent.start, ent.end + token_adicional, label="DIRECCIÓN"))
+                new_ents.append(generate_address_span(ent, new_ents, doc))
             if not is_from_first_tokens(ent.start) and is_ip_address(ent):
                 new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
             if not is_from_first_tokens(ent.start) and is_phone(ent):

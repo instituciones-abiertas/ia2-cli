@@ -1,4 +1,4 @@
-from pipeline_components.generic_matcher import GenericMatcher, repeat_patterns
+import logging
 from spacy.matcher import Matcher
 from spacy.tokens import Span
 from spacy.lang.es.lex_attrs import _num_words
@@ -31,8 +31,7 @@ num_words = _num_words + [
     "billones",
     "trillones",
 ]
-
-first_left_nbors = [
+page_first_left_nbors = [
     "página",
     "pag",
     "p",
@@ -43,14 +42,106 @@ first_left_nbors = [
     "inciso",
     "inc",
 ]
-second_left_nbors = [
+page_second_left_nbors = [
     "página",
     "pag",
     "fs",
     "inciso",
     "inc",
 ]
-first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
+measure_unit_first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "km", "kg", "cm"]
+
+article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
+
+#Violence
+gender_violence_context_text = "CONTEXTO_VIOLENCIA_DE_GÉNERO"
+violence_context_text = "CONTEXTO_VIOLENCIA"
+violence_nbors = ["violencia", "violencias"]
+violence_types = [
+    "ambiental",
+    "doméstica",
+    "domestica",
+    "económica",
+    "economica",
+    "física",
+    "fisica",
+    "patrimonial",
+    "psicológica",
+    "psicologica",
+    "sexual",
+    "simbólica",
+    "simbolica",
+    "social",
+]
+gender_violence_types = ["género", "genero"]
+
+
+def filter_longer_spans(spans, *, seen_tokens=set(), preserve_spans=[]):
+    """Filter a sequence of spans and remove duplicates or overlaps. Useful for
+    creating named entities (where one token can only be part of one entity) or
+    when merging spans with `Retokenizer.merge`. When spans overlap, the (first)
+    longest span is preferred over shorter spans.
+
+    spans (iterable): The spans to filter.
+    RETURNS (list): The filtered spans.
+    """
+
+    def get_sort_key(span):
+        return (span.end - span.start, -span.start)
+
+    sorted_spans = sorted(spans, key=get_sort_key, reverse=True)
+    result = preserve_spans
+    _seen_tokens = seen_tokens
+    for span in sorted_spans:
+        # Check for end - 1 here because boundaries are inclusive
+        if span.start not in _seen_tokens and span.end - 1 not in _seen_tokens:
+            result.append(span)
+        _seen_tokens.update(range(span.start, span.end))
+    result = sorted(result, key=lambda span: span.start)
+    return result
+
+
+def repeat_patterns(patterns, times):
+    """
+    Utility function that receives a pattern to return a list that contains
+    that pattern multiplied by times. The final length of the list is equal to
+    len(patterns) * times.
+    """
+    generated_patterns = []
+    for i in range(0, times):
+        [generated_patterns.append(pattern) for pattern in patterns]
+    return generated_patterns
+
+
+class GenericMatcher(object):
+    """
+    GenericMatcher: Given an NLP instance, and list of patterns, generates a
+    pipeline that matches tokens against each of those patterns to return an
+    updated Doc object.
+    """
+
+    name = "generic_matcher"
+
+    def __init__(self, nlp, matcher_patterns=[]):
+        self.nlp = nlp
+        self.matcher = Matcher(self.nlp.vocab, validate=True)
+        # Adds patterns to the Matcher pipeline
+        for entity_label, pattern in matcher_patterns:
+            self.matcher.add(entity_label, [pattern], on_match=None)
+
+    def __call__(self, doc):
+        matches = self.matcher(doc)
+        matched_spans = [Span(doc, start, end, self.nlp.vocab.strings[match_id]) for match_id, start, end in matches]
+        # Creates a set of seen tokens so that the filter_longer_spans function
+        # prioritizes those spans we are sending.
+        seen_tokens = set()
+        merged_matched_spans = filter_spans(matched_spans)
+        for span in merged_matched_spans:
+            seen_tokens.update(range(span.start, span.end))
+        doc_ents = merged_matched_spans + list(doc.ents)
+        # Merges adjacent entities and removes overlapped entities
+        doc.ents = filter_longer_spans(doc_ents, seen_tokens=seen_tokens, preserve_spans=merged_matched_spans)
+        return doc
 
 
 def exist_n_token(token_index, nbor_position, document_length):
@@ -154,7 +245,7 @@ class EntityMatcher(object):
                     document_length,
                     span,
                     "NUM",
-                    first_left_nbors,
+                    page_first_left_nbors,
                     -1,
                 )
 
@@ -163,12 +254,12 @@ class EntityMatcher(object):
                     document_length,
                     span,
                     "NUM",
-                    second_left_nbors,
+                    page_second_left_nbors,
                     -2,
                 )
 
             def does_not_have_first_right_nbor(document_length, span):
-                return not_in_nbor(document_length, span, "NUM", first_right_nbors, 1)
+                return not_in_nbor(document_length, span, "NUM", measure_unit_first_right_nbors, 1)
 
             if (
                 does_not_have_first_left_nbor(document_length, span)
@@ -180,15 +271,12 @@ class EntityMatcher(object):
                 # FIXME this one ent has been discarded by the nbor word lists.
                 # We should consider assigning them to an entity, or filter them
                 # somewhere else
-                print(f"[FIXME] Should process this span as another ent: `{span}`")
+                logging.info(f"[FIXME] Should process this span as another ent: `{span}`")
 
         for after_callback in self.after_callbacks:
             doc = after_callback(doc)
 
         return doc
-
-
-article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
 
 
 class ArticlesMatcher(object):
@@ -212,6 +300,49 @@ class ArticlesMatcher(object):
                     *repeat_patterns([{"ORTH": ",", "OP": "*"}, {"IS_DIGIT": True, "OP": "?"}], 14),
                     {"ORTH": "y", "OP": "?"},
                     {"IS_DIGIT": True, "OP": "?"},
+                ],
+            ),
+        ]
+
+
+class ViolenceContextMatcher(object):
+    name = "violence_context_matcher"
+
+    def __init__(self, nlp):
+        violence_context_patterns = self.get_violence_context_patterns()
+        self.matcher = GenericMatcher(nlp, violence_context_patterns)
+
+    def __call__(self, doc):
+        return self.matcher(doc)
+
+    def get_violence_context_patterns(self):
+        return [
+            (
+                gender_violence_context_text,
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"ORTH": "de"},
+                    {"LOWER": {"IN": gender_violence_types}},
+                ],
+            ),
+            (
+                violence_context_text,
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"LOWER": {"IN": violence_types}},
+                ],
+            ),
+            (
+                violence_context_text,
+                [
+                    {"LOWER": {"IN": violence_nbors}},
+                    {"IS_PUNCT": True, "OP": "?"},
+                    {"LOWER": {"IN": violence_types}, "OP": "?"},
+                    *repeat_patterns([{"ORTH": ",", "OP": "*"}, {"LOWER": {"IN": violence_types}, "OP": "?"}], 7),
+                    {"ORTH": "y", "OP": "+"},
+                    {"LOWER": {"IN": violence_types}, "OP": "+"},
                 ],
             ),
         ]

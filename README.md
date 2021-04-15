@@ -224,13 +224,13 @@ Ejecuta un comando en consola y guarda en el horario de comienzo y de fin en un 
 - `command_to_run`: Es el comando a ejecutar con parametros y espacios incluido.Va entre comillas dobles
 
 ```bash
-python train.py run_command_with_timer <command>
+python utils.py run_command_with_timer <command>
 ```
 
 **Ejemplo:**
 
 ```bash
-python train.py run_command_with_timer "python train.py example_train_config example"
+python utils.py run_command_with_timer "python train.py example_train_config example"
 ```
 
 ## Despliegue de modelo
@@ -282,6 +282,10 @@ export TEST_MODEL_FILE=models/path_to_my_model
 # Otro ejemplo de un modelo de Spacy descargado utilizando (python -m spacy download es_core_news_lg)
 export TEST_MODEL_FILE=es_core_news_lg
 ```
+
+## Licencia
+
+[**GNU General Public License version 3**](LICENSE)
 
 ## Contribuciones
 
