@@ -27,15 +27,40 @@ law_left_nbors = [
     "leyes",
 ]
 
-address_first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
-                    "avenida", "av.", "Avenida", "Av.", 
-                    "pasaje", "Pasaje", "Parcela", "parcela"]
-                    
+address_first_left_nbors = [
+    "calle",
+    "Calle",
+    "dirección",
+    "Dirección",
+    "avenida",
+    "av.",
+    "Avenida",
+    "Av.",
+    "pasaje",
+    "Pasaje",
+    "Parcela",
+    "parcela",
+]
+
 address_second_left_nbors = [
-    "instalación", "contramano", "sita", "sitas", "sito", "sitos",
-    "real", "domiciliado", "domiciliada", "constituido",
-    "constituida", "contramano", "intersección", "domicilio",
-    "ubicado", "registrado", "ubicada", "real"
+    "instalación",
+    "contramano",
+    "sita",
+    "sitas",
+    "sito",
+    "sitos",
+    "real",
+    "domiciliado",
+    "domiciliada",
+    "constituido",
+    "constituida",
+    "contramano",
+    "intersección",
+    "domicilio",
+    "ubicado",
+    "registrado",
+    "ubicada",
+    "real",
 ]
 
 address_connector = "en"
@@ -93,16 +118,23 @@ def is_age(token, right_token, token_sent):
 
 def is_caseNumber(token, first_left_token, second_left_token, token_sent):
     return token.like_num and (
-        (first_left_token.lower_ == number_abreviated_indicator and second_left_token.lower_ == case_second_left_token) or first_left_token.lower_ == case_first_left_token
+        (first_left_token.lower_ == number_abreviated_indicator and second_left_token.lower_ == case_second_left_token)
+        or first_left_token.lower_ == case_first_left_token
     )
 
 
 def is_cuijNumber(token):
-    return (token.is_ascii and token.nbor(-3).lower_ == cuij_indicator) or (token.like_num and token.nbor(-3).lower_ == cuij_indicator)
+    return (token.is_ascii and token.nbor(-3).lower_ == cuij_indicator) or (
+        token.like_num and token.nbor(-3).lower_ == cuij_indicator
+    )
 
 
 def is_actuacionNumber(token):
-    return token.nbor(-1).lower_ == ":" and token.nbor(-2).lower_ == actuacion_number_indicator and token.nbor(-3).lower_ == actuacion_nbor_token
+    return (
+        token.nbor(-1).lower_ == ":"
+        and token.nbor(-2).lower_ == actuacion_number_indicator
+        and token.nbor(-3).lower_ == actuacion_nbor_token
+    )
 
 
 def is_expedienteNumber(token):
@@ -110,6 +142,19 @@ def is_expedienteNumber(token):
         token.nbor(-1).lower_ == number_abreviated_indicator
         and (token.nbor(-3).lower_ == expediente_indicator or token.nbor(-2).lower_ == expediente_indicator)
     ) or (token.like_num and token.nbor(-2).lower_ == expediente_indicator)
+
+
+def is_place_token(token):
+    # TODO Este enfoque puede generar falsos positivos
+    first_left_nbors = [
+        "asentamiento",
+        "paraje",
+        "localidad",
+        "country",
+        "distrito",
+    ]
+
+    return token.nbor(-1).lower_ in first_left_nbors
 
 
 def is_law(ent):
@@ -209,11 +254,12 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
-#TODO this function could be used in many methods, check it!
+
+# TODO this function could be used in many methods, check it!
 def is_token_in_x_left_pos(token, pos, nbors):
     try:
         return token.nbor(-pos).lower_ in nbors
-    except:
+    except Exception:
         return False
 
 
@@ -270,7 +316,12 @@ def get_aditional_left_tokens_for_address(ent):
 
 def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
     for i, ent_from_list in enumerate(list_entities):
-        if ent_start >= ent_from_list.start and ent_start <= ent_from_list.end or ent_end >= ent_from_list.start and ent_end <= ent_from_list.end:
+        if (
+            ent_start >= ent_from_list.start
+            and ent_start <= ent_from_list.end
+            or ent_end >= ent_from_list.start
+            and ent_end <= ent_from_list.end
+        ):
             return ent_from_list
     return None
 
@@ -362,6 +413,9 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
+            if not is_from_first_tokens(token.i) and is_place_token(token):
+                new_ents.append(Span(doc, token.i - 1, token.i + 1, label="LOC"))
+
         for i, ent in enumerate(doc.ents):
             # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
             if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):

@@ -114,9 +114,83 @@ class EntityCustomTest(unittest.TestCase):
                 # can correctly pick up a span with text "seis {nbor}"
                 expected_span = Span(doc, target_span_start, target_span_end, label="LEY")
                 self.assertEqual(expected_span.text, law_num)
-                # Asserts a LEY span exists in the document entities
+                # Asserts a PERIODO span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
- 
+
+    def test_a_custom_entity_pipeline_detect_loc_entities(self):
+        locs = ["YPF", "504"]
+        base_test_senteces = [
+            (
+                4,
+                6,
+                "Existio un allanamiento en paraje {loc_nbor} donde se encontraron estupefacientes ",
+            ),
+            (
+                12,
+                14,
+                "Existe un procedimiento a llevarse a cabo dentro del radio de el asentamiento {loc_nbor} de la periferia de la ciudad",
+            ),
+            (
+                12,
+                14,
+                "Existe un procedimiento a llevarse a cabo dentro del radio de la localidad {loc_nbor} de la periferia de la ciudad",
+            ),
+            (
+                24,
+                26,
+                "En la mañana Fierro, Martin s/art. 23 Inculpar a vecino por desacato judicial o administrativa en la actualidad ubicada en country {loc_nbor}",
+            ),
+        ]
+
+        test_sentences = list(itertools.product(locs, base_test_senteces))
+
+        for (left_nbor_word, (target_span_start, target_span_end, base_test_sentece_text)) in test_sentences:
+
+            test_sentence = base_test_sentece_text.format(loc_nbor=left_nbor_word)
+
+            doc = self.nlp(test_sentence)
+
+            expected_span = Span(doc, target_span_start, target_span_end, label="LOC")
+            # Check if span detected in doc.ents
+            self.assertIn(expected_span, doc.ents)
+
+    def test_a_custom_entity_pipeline_detect_false_positive_loc_entities(self):
+        # Primer test para chequear casos de falsos positivios en PER no esten incluidos en las ocurrencias detectadas
+        locs = ["Moreno", "Fierro"]
+        base_test_sentences = [
+            (
+                6,
+                8,
+                10,
+                12,
+                "En las personas de  Juan Antonio Barrio {loc_name} y mariela barrio {loc_name} se encontraron estupefacientes ",
+            ),
+            (6, 8, 10, 12, "Acompañada de otras personas como Roxana villa {loc_name}, Martín Villa {loc_name}  "),
+        ]
+
+        test_sentences = list(itertools.product(locs, base_test_sentences))
+        for (
+            right_loc_word,
+            (
+                target_span_start,
+                target_span_end,
+                another_target_span_start,
+                another_target_span_end,
+                base_test_sentece_text,
+            ),
+        ) in test_sentences:
+
+            test_sentence = base_test_sentece_text.format(loc_name=right_loc_word)
+
+            doc = self.nlp(test_sentence)
+
+            expected_span = Span(doc, target_span_start, target_span_end, label="LOC")
+            another_expected_span = Span(doc, another_target_span_start, another_target_span_end, label="LOC")
+            # Filtrado solo entidades del tipo LOC
+            # onlyLOCents = list(filter(lambda ent: ent.label_ == "LOC", doc.ents))
+            self.assertNotIn(expected_span, doc.ents)
+            self.assertNotIn(another_expected_span, doc.ents)
+
     def test_a_custom_entity_pipeline_detects_license_plates_entities(self):
         base_test_senteces = [
             (
@@ -157,7 +231,7 @@ class EntityCustomTest(unittest.TestCase):
                 self.assertEqual(expected_span.text, target_span_text)
                 # Asserts a PATENTE_DOMINIO span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
- 
+
     def test_a_custom_entity_pipeline_removes_articles_marked_as_license_plates_entities(self):
         base_test_senteces = [
             (
@@ -184,7 +258,7 @@ class EntityCustomTest(unittest.TestCase):
                 "calle 44, nro 62",
                 10,
                 15,
-                "El titular es Mariano Casas con domicilio registrado en la {address}, localidad de Villa Elisa, Provincia de Buenos Aires."
+                "El titular es Mariano Casas con domicilio registrado en la {address}, localidad de Villa Elisa, Provincia de Buenos Aires.",
             ),
             (
                 "Vieytes 1690",
@@ -211,7 +285,7 @@ class EntityCustomTest(unittest.TestCase):
                 "El Sr. Cristian Gomez, con último domicilio en la calle {address} de esta Ciudad; para que una vez que sea encontrado, sea detenido",
             ),
             (
-                "Av. Chaco 655", 
+                "Av. Chaco 655",
                 10,
                 13,
                 "acercándose al domicilio de su ex pareja, con dirección {address}, de esta Ciudad",
@@ -220,18 +294,18 @@ class EntityCustomTest(unittest.TestCase):
                 "Angel Peribubuy 123",
                 5,
                 8,
-                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado"
+                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado",
             ),
             (
                 "Peribubuy 123",
                 5,
                 7,
-                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado"
-            ),            
+                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado",
+            ),
             (
                 "Parcela 4",
                 15,
-                17, #FIXME no incluye depto "Parcela 4 Dpto. E",
+                17,  # FIXME no incluye depto "Parcela 4 Dpto. E",
                 "Fijar residencia en el domicilio de su madre ubicado en el Barrio La Boca 12 {address} de esta ciudad ",
             ),
         ]
@@ -369,8 +443,8 @@ class EntityCustomTest(unittest.TestCase):
  
     def test_a_custom_entity_pipeline_detects_advisor(self):
         print("TODO: not implemented")
-        pass    
- 
+        pass
+
     def test_a_custom_entity_pipeline_detects_ip_address(self):
         print("TODO: not implemented")
         pass
