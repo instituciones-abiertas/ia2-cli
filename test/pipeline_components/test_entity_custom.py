@@ -6,7 +6,7 @@ from pipeline_components.entity_custom import (
     address_first_left_nbors,
     address_second_left_nbors,
     age_right_token,
-    age_text_in_token,    
+    age_text_in_token,
 )
 from pipeline_components.entity_matcher import (
     EntityMatcher,
@@ -30,7 +30,6 @@ class EntityCustomTest(unittest.TestCase):
         # Loads a Spacy model
         pipeline = ["entity_ruler", "entity_matcher", "entity_custom"]
         self.nlp = ModelSetup(pipeline)
-
 
     def test_a_custom_entity_pipeline_detects_periods(self):
         base_test_senteces = [
@@ -77,7 +76,6 @@ class EntityCustomTest(unittest.TestCase):
                 # Asserts a PERIODO span exists in the document entities
                 self.assertIn(a_like_num_span, doc.ents)
 
-
     def test_a_custom_entity_pipeline_detects_law_entities(self):
         nums = ["5845", "5666", "6", "12"]
         base_test_senteces = [
@@ -117,12 +115,12 @@ class EntityCustomTest(unittest.TestCase):
             (
                 4,
                 6,
-                "Existio un allanamiento en Barrio {loc_nbor} donde se encontraron estupefacientes ",
+                "Existio un allanamiento en paraje {loc_nbor} donde se encontraron estupefacientes ",
             ),
             (
                 12,
                 14,
-                "Existe un procedimiento a llevarse a cabo dentro del radio de la villa {loc_nbor} de la periferia de la ciudad",
+                "Existe un procedimiento a llevarse a cabo dentro del radio de el asentamiento {loc_nbor} de la periferia de la ciudad",
             ),
             (
                 12,
@@ -130,9 +128,9 @@ class EntityCustomTest(unittest.TestCase):
                 "Existe un procedimiento a llevarse a cabo dentro del radio de la localidad {loc_nbor} de la periferia de la ciudad",
             ),
             (
-                23,
-                25,
-                "En la mañana Fierro, Martin s/art. 23 Inculpar a vecino por desacato judicial o administrativa en la actualidad en Paraje {loc_nbor}",
+                24,
+                26,
+                "En la mañana Fierro, Martin s/art. 23 Inculpar a vecino por desacato judicial o administrativa en la actualidad ubicada en country {loc_nbor}",
             ),
         ]
 
@@ -226,7 +224,6 @@ class EntityCustomTest(unittest.TestCase):
                 # Asserts a PATENTE_DOMINIO span exists in the document entities
                 self.assertIn(expected_span, doc.ents)
 
-
     def test_a_custom_entity_pipeline_removes_articles_marked_as_license_plates_entities(self):
         base_test_senteces = [
             (
@@ -247,14 +244,13 @@ class EntityCustomTest(unittest.TestCase):
             # Asserts a ART span exists in the document entities
             self.assertNotIn(expected_span, doc.ents)
 
-
     def test_a_custom_entity_pipeline_detects_address_entities(self):
         base_test_sentences = [
             (
                 "calle 44, nro 62",
                 10,
                 15,
-                "El titular es Mariano Casas con domicilio registrado en la {address}, localidad de Villa Elisa, Provincia de Buenos Aires."
+                "El titular es Mariano Casas con domicilio registrado en la {address}, localidad de Villa Elisa, Provincia de Buenos Aires.",
             ),
             (
                 "Vieytes 1690",
@@ -281,7 +277,7 @@ class EntityCustomTest(unittest.TestCase):
                 "El Sr. Cristian Gomez, con último domicilio en la calle {address} de esta Ciudad; para que una vez que sea encontrado, sea detenido",
             ),
             (
-                "Av. Chaco 655", 
+                "Av. Chaco 655",
                 10,
                 13,
                 "acercándose al domicilio de su ex pareja, con dirección {address}, de esta Ciudad",
@@ -290,18 +286,18 @@ class EntityCustomTest(unittest.TestCase):
                 "Angel Peribubuy 123",
                 5,
                 8,
-                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado"
+                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado",
             ),
             (
                 "Peribubuy 123",
                 5,
                 7,
-                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado"
-            ),            
+                "La acusada fue ubicada en {address} con dos armas cortantes y un teléfono celular robado",
+            ),
             (
                 "Parcela 4",
                 15,
-                17, #FIXME no incluye depto "Parcela 4 Dpto. E",
+                17,  # FIXME no incluye depto "Parcela 4 Dpto. E",
                 "Fijar residencia en el domicilio de su madre ubicado en el Barrio La Boca 12 {address} de esta ciudad ",
             ),
         ]
@@ -315,7 +311,6 @@ class EntityCustomTest(unittest.TestCase):
                 # Asserts a DIRECCIÓN span exists in the document entities
                 # print(f"doc.ents {doc.ents}")
                 self.assertIn(expected_span, doc.ents)
-
 
     def test_a_custom_entity_pipeline_detext_fecha_resolucion(self):
         # 1) La primera fecha que encuentra si esta dentro de los primeros 100 tokens entonces lo transforma a FECHA_RESOLUCION
@@ -346,7 +341,6 @@ class EntityCustomTest(unittest.TestCase):
             expected_span = Span(doc, start, end, label=label)
             self.assertEqual(expected_span.text, fecha)
             self.assertIn(expected_span, doc.ents)
-
 
     def test_a_custom_entity_pipeline_detects_age(self):
         print("TODO: not implemented")
@@ -390,7 +384,7 @@ class EntityCustomTest(unittest.TestCase):
 
     def test_a_custom_entity_pipeline_detects_advisor(self):
         print("TODO: not implemented")
-        pass    
+        pass
 
     def test_a_custom_entity_pipeline_detects_ip_address(self):
         print("TODO: not implemented")
