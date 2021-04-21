@@ -12,6 +12,7 @@ import spacy
 import time
 import shutil
 import utils
+import csv
 from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
 from spacy.gold import GoldParse
@@ -325,13 +326,13 @@ class SpacyUtils:
                 if settings["evaluate"] == "val":
                     logger.info("Evaluating docs from validation data")
                     val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
-                        optimizer, nlp, val_texts, val_annotations
+                        optimizer, nlp, val_texts, val_annotations, "validation"
                     )
 
                 # train data score
                 logger.info("Evaluating docs from training data")                
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, tr_texts, tr_annotations
+                    optimizer, nlp, tr_texts, tr_annotations, "training"
                 )
 
                 numero_losses = losses.get("ner")
@@ -367,7 +368,7 @@ class SpacyUtils:
             if settings["evaluate"] == "test" and state["evaluate_test"]:
                 logger.info("Evaluating docs from testing data")                
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, test_texts, test_annotations
+                    optimizer, nlp, test_texts, test_annotations, "test"
                 )
                 logger.info("############################################################")
                 logger.info("Evaluating saved model with test data")
@@ -647,31 +648,75 @@ class SpacyUtils:
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
-            return scorer.scores, is_missaligned_doc
+            return scorer.scores, is_missaligned_doc, alignment_values
         except Exception as e:
             print(e)
 
-    def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list):
+    def save_csv_missaligned_docs(self, nlp, filename="missaligned.json", missaligned=[]):
+        path = f"logs/{filename}"
+        logger.info("\n\n")
+        logger.info(f"[save_csv_missaligned] 💾 Saving missaligned in a {path} file")
+        # create file if not exists
+        if not os.path.exists(path):
+            with open(path, "w"):
+                pass
+
+        data = []
+        logger.info("\n[save_csv_missaligned] preparing rows ...")
+        for i in range(len(missaligned)):
+            text_raw = missaligned[i]["text"]
+            text_array = nlp.tokenizer(text_raw)
+            missaligned_array = missaligned[i]["alignment_values"]
+            print(f'missaligned[i][alignment_values] {missaligned[i]["alignment_values"]}')
+
+            indexes = [i for i, x in enumerate(missaligned_array) if x == "-"]
+            missaligned_texts = [str(x) for i, x in enumerate(text_array) if i in indexes]
+            annotations = missaligned[i]["entities"]["entities"]
+            missaligned_annotations = []
+            for i, annot in enumerate(annotations):
+                # import pdb; pdb.set_trace()
+                #FIXME por qué guarda annotations = []?
+                if str(text_raw[annot[0]:annot[1]]) in missaligned_texts:
+                    print(f"adding to missaligned annotations: {annotations[i]}")
+                    missaligned_annotations.append(annotations[i])
+            print(f"missaligned annotations len: {len(missaligned_annotations)}")
+            data.append({"text": text_raw, "annotations": missaligned_annotations})
+            # data.append({"text": text_array, "annotations": missaligned[i]["entities"]["entities"]})
+
+        srsly.write_json(path, data)
+
+        logger.info(f"[save_csv_missaligned] 💾 saved!! {path} file")
+
+
+    def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list, data_type):
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
         missaligned_docs = 0
         ents_per_type_sum = {}
+        missaligned = []
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
-                scores, is_missaligned_doc = self.evaluate(nlp, text, entities_for_text)
+                scores, is_missaligned_doc, alignment_values = self.evaluate(nlp, text, entities_for_text)
                 missaligned_docs += 1 if is_missaligned_doc else 0
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
+                
+                if is_missaligned_doc:
+                    missaligned.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
 
                 for key, value in scores["ents_per_type"].items():
                     if key not in ents_per_type_sum:
                         ents_per_type_sum[key] = value["f"]
                     else:
                         ents_per_type_sum[key] += value["f"]
+
+        #FIXME está guardando docs que aparentemente están missaligned pero en annotations no hay nada
+        if missaligned_docs and len(missaligned):
+            self.save_csv_missaligned_docs(nlp, f"{data_type}_missaligned_docs.json", missaligned)
 
         logger.info(f'Missaligned docs for ⤴️: {missaligned_docs}/{len(texts)} ({round(100*missaligned_docs/len(texts),2)}%).')
         for key, value in ents_per_type_sum.items():
@@ -819,6 +864,43 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
         for text in texts:
             print(text)
 
+    def show_json_text(self, files_path: str, context_words: int = 0, entity: str=None):
+        """
+        Given the path to a .json format input file directory and an
+        entity name, prints the annotation text from label.
+        The idea of this function is to detect / be able to fix missaligned docs.
+
+        :param files_path: Directory pointing to .json files
+        :param context_words: integer for nbor words.
+        :param entity: entity label name.
+        """
+
+        W = "\033[0m"  # white (normal)
+        R = "\033[31m"  # red
+        G = "\033[32m"  # green
+        files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
+        texts = []
+
+        for file_ in files:
+            with open(file_, "r") as f:
+                # import pdb; pdb.set_trace()
+                data = json.load(f)
+                for doc in data:
+                    for a in doc["annotations"] or []:
+                        start = a[0]
+                        end = a[1]
+                        output = ""
+                        if str(a[2]) == entity or entity == None:
+                            #TODO context_words debería buscar palabras y NO caracteres
+                            context_left = doc["text"][start - context_words: start]
+                            context_right = doc["text"][end: end + context_words]
+                            output = doc["text"][start:end]
+                            posicion = f" -- Start: {G}{str(start)} {W}End: {G}{str(end)}{W}"
+                            output = f"{context_left}{G}{output}{W}{context_right}"
+                            texts.append(str(a[2]) + ": "+output.replace("\\", "") + posicion)
+
+        for text in texts:
+            print(text)
 
 if __name__ == "__main__":
     fire.Fire(SpacyUtils)
