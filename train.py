@@ -644,69 +644,123 @@ class SpacyUtils:
         try:
             doc_gold_text = nlp.make_doc(text)
             alignment_values = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
-            is_missaligned_doc = True if '-' in alignment_values else False
+            is_misaligned_doc = True if '-' in alignment_values else False
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
-            return scorer.scores, is_missaligned_doc, alignment_values
+            return scorer.scores, is_misaligned_doc, alignment_values
         except Exception as e:
             print(e)
 
-    def save_csv_missaligned_docs(self, nlp, filename="missaligned.json", missaligned=[]):
+    def get_misaligned_texts(self, misaligned_array, text_array):
+        """
+        Given a list of alignment values for a doc and an array with the tokenized doc, 
+        it find and returns an array of matching misaligned annotations.
+
+        :param misaligned_array: A list of alignment values for a doc.
+        :param text_array: A list that represents a tokenized doc.
+        """        
+        misaligned_indexes = [i for i, x in enumerate(misaligned_array) if x == "-"]
+        misaligned_texts = []
+        i = 0
+        word_ended = False
+        next_index_is_consecutive = False
+        text = ""
+
+        while i < len(misaligned_indexes):
+            token_text = text_array[misaligned_indexes[i]].text
+            try:
+                next_index_is_consecutive = len(misaligned_indexes) > 1 and (misaligned_indexes[i+1] - misaligned_indexes[i]) == 1
+            except:
+                next_index_is_consecutive = False
+
+            if i == 0 or text == "":
+                it_follows_prev_index = False 
+                text = token_text
+            else:                
+                it_follows_prev_index = (misaligned_indexes[i] - misaligned_indexes[i-1]) == 1
+            
+            if it_follows_prev_index:
+                text = text + " "+ token_text
+
+            word_ended = not next_index_is_consecutive
+
+            if word_ended:
+                misaligned_texts.append(text.replace(' ', ''))
+                text = ""
+            
+            i = i+1
+
+        return misaligned_texts
+
+    def save_csv_misaligned_docs(self, nlp, filename="misaligned.json", misaligned=[]):
+        """
+        IMPORTANT! This function is being called when training the model.
+
+        Given a filename and an array of misaligned docs, it finds for every doc only 
+        matching misaligned annotations and saves them to a json file with a structure similar
+        to the one used by Spacy for training data (json object with text and annotations).
+        The file/s are being saved in logs folder.
+
+        :param filename: A filename for the json file that is going to be saved.
+        :param misaligned: A list of misaligned docs.
+        """
         path = f"logs/{filename}"
         logger.info("\n\n")
-        logger.info(f"[save_csv_missaligned] 💾 Saving missaligned in a {path} file")
+        logger.info(f"[save_csv_misaligned] 💾 Saving misaligned in a {path} file")
         # create file if not exists
         if not os.path.exists(path):
             with open(path, "w"):
                 pass
 
         data = []
-        logger.info("\n[save_csv_missaligned] preparing rows ...")
-        for i in range(len(missaligned)):
-            text_raw = missaligned[i]["text"]
+        logger.info("\n[save_csv_misaligned] preparing rows ...")
+        for i in range(len(misaligned)):
+            text_raw = misaligned[i]["text"]
             text_array = nlp.tokenizer(text_raw)
-            missaligned_array = missaligned[i]["alignment_values"]
-            print(f'missaligned[i][alignment_values] {missaligned[i]["alignment_values"]}')
+            misaligned_texts = self.get_misaligned_texts(misaligned[i]["alignment_values"], text_array)
+            # print(f"tunneados!! misaligned_texts: {misaligned_texts}")
 
-            indexes = [i for i, x in enumerate(missaligned_array) if x == "-"]
-            missaligned_texts = [str(x) for i, x in enumerate(text_array) if i in indexes]
-            annotations = missaligned[i]["entities"]["entities"]
-            missaligned_annotations = []
+            annotations = misaligned[i]["entities"]["entities"]
+            misaligned_annotations = []
+
             for i, annot in enumerate(annotations):
+                annotation_text = str(text_raw[annot[0]:annot[1]])
+                # print(f"annotation_text: {annotation_text.replace(' ', '')}")
                 # import pdb; pdb.set_trace()
-                #FIXME por qué guarda annotations = []?
-                if str(text_raw[annot[0]:annot[1]]) in missaligned_texts:
-                    print(f"adding to missaligned annotations: {annotations[i]}")
-                    missaligned_annotations.append(annotations[i])
-            print(f"missaligned annotations len: {len(missaligned_annotations)}")
-            data.append({"text": text_raw, "annotations": missaligned_annotations})
-            # data.append({"text": text_array, "annotations": missaligned[i]["entities"]["entities"]})
+                if any(annotation_text.replace(' ', '') in text for text in misaligned_texts):
+                    # print(f"adding to misaligned annotations: {annotation_text}")
+                    annotation = annotations[i]
+                    annotation.append(annotation_text)
+                    misaligned_annotations.append(annotation)
+
+            # print(f"misaligned annotations len: {len(misaligned_annotations)}")
+            data.append({"text": text_raw, "annotations": misaligned_annotations})
 
         srsly.write_json(path, data)
 
-        logger.info(f"[save_csv_missaligned] 💾 saved!! {path} file")
+        logger.info(f"[save_csv_misaligned] 💾 saved!! {path} file")
 
 
     def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list, data_type):
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
-        missaligned_docs = 0
+        misaligned_docs = 0
         ents_per_type_sum = {}
-        missaligned = []
+        misaligned = []
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
-                scores, is_missaligned_doc, alignment_values = self.evaluate(nlp, text, entities_for_text)
-                missaligned_docs += 1 if is_missaligned_doc else 0
+                scores, is_misaligned_doc, alignment_values = self.evaluate(nlp, text, entities_for_text)
+                misaligned_docs += 1 if is_misaligned_doc else 0
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
                 
-                if is_missaligned_doc:
-                    missaligned.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
+                if is_misaligned_doc:
+                    misaligned.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
 
                 for key, value in scores["ents_per_type"].items():
                     if key not in ents_per_type_sum:
@@ -714,11 +768,10 @@ class SpacyUtils:
                     else:
                         ents_per_type_sum[key] += value["f"]
 
-        #FIXME está guardando docs que aparentemente están missaligned pero en annotations no hay nada
-        if missaligned_docs and len(missaligned):
-            self.save_csv_missaligned_docs(nlp, f"{data_type}_missaligned_docs.json", missaligned)
+        if misaligned_docs:
+            self.save_csv_misaligned_docs(nlp, f"{data_type}_misaligned_docs.json", misaligned)
 
-        logger.info(f'Missaligned docs for ⤴️: {missaligned_docs}/{len(texts)} ({round(100*missaligned_docs/len(texts),2)}%).')
+        logger.info(f'Misaligned docs for ⤴️: {misaligned_docs}/{len(texts)} ({round(100*misaligned_docs/len(texts),2)}%).')
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
 
@@ -860,44 +913,6 @@ Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCust
                                     G, str(a["points"][0]["start"]), W, G, str(a["points"][0]["end"]), W
                                 )
                                 texts.append(output.replace("\\", "") + posicion)
-
-        for text in texts:
-            print(text)
-
-    def show_json_text(self, files_path: str, context_words: int = 0, entity: str=None):
-        """
-        Given the path to a .json format input file directory and an
-        entity name, prints the annotation text from label.
-        The idea of this function is to detect / be able to fix missaligned docs.
-
-        :param files_path: Directory pointing to .json files
-        :param context_words: integer for nbor words.
-        :param entity: entity label name.
-        """
-
-        W = "\033[0m"  # white (normal)
-        R = "\033[31m"  # red
-        G = "\033[32m"  # green
-        files = [os.path.join(files_path, f) for f in listdir(files_path) if isfile(join(files_path, f))]
-        texts = []
-
-        for file_ in files:
-            with open(file_, "r") as f:
-                # import pdb; pdb.set_trace()
-                data = json.load(f)
-                for doc in data:
-                    for a in doc["annotations"] or []:
-                        start = a[0]
-                        end = a[1]
-                        output = ""
-                        if str(a[2]) == entity or entity == None:
-                            #TODO context_words debería buscar palabras y NO caracteres
-                            context_left = doc["text"][start - context_words: start]
-                            context_right = doc["text"][end: end + context_words]
-                            output = doc["text"][start:end]
-                            posicion = f" -- Start: {G}{str(start)} {W}End: {G}{str(end)}{W}"
-                            output = f"{context_left}{G}{output}{W}{context_right}"
-                            texts.append(str(a[2]) + ": "+output.replace("\\", "") + posicion)
 
         for text in texts:
             print(text)
