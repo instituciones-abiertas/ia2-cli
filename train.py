@@ -715,9 +715,16 @@ class SpacyUtils:
 
         data = []
         logger.info("\n[save_csv_misaligned] preparing rows ...")
+
         for i in range(len(misaligned)):
             text_raw = misaligned[i]["text"]
-            text_array = nlp.tokenizer(text_raw)
+            text_array = nlp(text_raw)
+            #to check how is being tokenized and understand why the misaligned warning
+            # if "validation" in filename: 
+                # tok_exp = nlp.tokenizer.explain(text_raw)
+                # for t in tok_exp:
+                    # if "-" in t[1]:
+                        # print(t[1], "\t", t[0])
             misaligned_texts = self.get_misaligned_texts(misaligned[i]["alignment_values"], text_array)
             # print(f"tunneados!! misaligned_texts: {misaligned_texts}")
 
@@ -726,8 +733,6 @@ class SpacyUtils:
 
             for i, annot in enumerate(annotations):
                 annotation_text = str(text_raw[annot[0]:annot[1]])
-                # print(f"annotation_text: {annotation_text.replace(' ', '')}")
-                # import pdb; pdb.set_trace()
                 if any(annotation_text.replace(' ', '') in text for text in misaligned_texts):
                     # print(f"adding to misaligned annotations: {annotation_text}")
                     annotation = annotations[i]
@@ -749,6 +754,8 @@ class SpacyUtils:
         misaligned_docs = 0
         ents_per_type_sum = {}
         misaligned = []
+        misaligned_lost_by_entities = {}
+        total_by_entities = {}
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
@@ -758,9 +765,19 @@ class SpacyUtils:
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
-                
+                for span in entities_for_text['entities']:
+                    try:
+                        total_by_entities[span[2]] = total_by_entities[span[2]] + 1
+                    except:
+                        total_by_entities[span[2]] = 1
+
                 if is_misaligned_doc:
                     misaligned.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
+                    for span in entities_for_text['entities']:
+                        try:
+                            misaligned_lost_by_entities[span[2]] = misaligned_lost_by_entities[span[2]] + 1
+                        except:
+                            misaligned_lost_by_entities[span[2]] = 1
 
                 for key, value in scores["ents_per_type"].items():
                     if key not in ents_per_type_sum:
@@ -772,6 +789,8 @@ class SpacyUtils:
             self.save_csv_misaligned_docs(nlp, f"{data_type}_misaligned_docs.json", misaligned)
 
         logger.info(f'Misaligned docs for ⤴️: {misaligned_docs}/{len(texts)} ({round(100*misaligned_docs/len(texts),2)}%).')
+        logger.info(f'Total by entities: {total_by_entities}.')
+        logger.info(f'Misaligned lost by entities: {misaligned_lost_by_entities}.')
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
 
