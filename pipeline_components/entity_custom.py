@@ -70,30 +70,91 @@ license_plate_left_nbor = [
     "dominio",
 ]
 
+age_right_token = "años"
+age_text_in_token = "edad"
+number_abreviated_indicator = "nº"
+case_first_left_token = "caso"
+case_second_left_token = "causa"
+cuij_indicator = "cuij"
+actuacion_number_indicator = "nro"
+actuacion_nbor_token = "actuación"
+expediente_indicator = "expediente"
+
+judge_lemma = ["juez", "jueza", "Juez", "Jueza"]
+secretarix_lemma = [
+    "secretario",
+    "secretaria",
+    "prosecretario",
+    "prosecretaria",
+    "Prosecretario",
+    "Prosecretaria",
+    "Secretario",
+    "Secretaria",
+]
+prosecutor_lemma = ["fiscal", "fiscalía", "Fiscal", "Fiscalía"]
+ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
+accused_lemma = [
+    "acusado",
+    "acusada",
+    "imputado",
+    "imputada",
+    "infractor",
+    "infractora",
+    "Acusado",
+    "Acusada",
+    "Imputado",
+    "Imputada",
+    "Infractor",
+    "Infractora",
+]
+advisor_lemma = ["asesor", "asesora", "Asesor", "Asesora"]
+phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico"]
+phone_text = ["telefono", "tel", "cel"]
+
 
 def is_age(token, right_token, token_sent):
-    return token.like_num and right_token.text == "años" and "edad" in token_sent.text
+    return token.like_num and right_token.text == age_right_token and age_text_in_token in token_sent.text
 
 
 def is_caseNumber(token, first_left_token, second_left_token, token_sent):
     return token.like_num and (
-        (first_left_token.lower_ == "nº" and second_left_token.lower_ == "causa") or first_left_token.lower_ == "caso"
+        (first_left_token.lower_ == number_abreviated_indicator and second_left_token.lower_ == case_second_left_token)
+        or first_left_token.lower_ == case_first_left_token
     )
 
 
 def is_cuijNumber(token):
-    return (token.is_ascii and token.nbor(-3).lower_ == "cuij") or (token.like_num and token.nbor(-3).lower_ == "cuij")
+    return (token.is_ascii and token.nbor(-3).lower_ == cuij_indicator) or (
+        token.like_num and token.nbor(-3).lower_ == cuij_indicator
+    )
 
 
 def is_actuacionNumber(token):
-    return token.nbor(-1).lower_ == ":" and token.nbor(-2).lower_ == "nro" and token.nbor(-3).lower_ == "actuación"
+    return (
+        token.nbor(-1).lower_ == ":"
+        and token.nbor(-2).lower_ == actuacion_number_indicator
+        and token.nbor(-3).lower_ == actuacion_nbor_token
+    )
 
 
 def is_expedienteNumber(token):
     return (
-        token.nbor(-1).lower_ == "nº"
-        and (token.nbor(-3).lower_ == "expediente" or token.nbor(-2).lower_ == "expediente")
-    ) or (token.like_num and token.nbor(-2).lower_ == "expediente")
+        token.nbor(-1).lower_ == number_abreviated_indicator
+        and (token.nbor(-3).lower_ == expediente_indicator or token.nbor(-2).lower_ == expediente_indicator)
+    ) or (token.like_num and token.nbor(-2).lower_ == expediente_indicator)
+
+
+def is_place_token(token):
+    # TODO Este enfoque puede generar falsos positivos
+    first_left_nbors = [
+        "asentamiento",
+        "paraje",
+        "localidad",
+        "country",
+        "distrito",
+    ]
+
+    return token.nbor(-1).lower_ in first_left_nbors
 
 
 def is_law(ent):
@@ -118,7 +179,6 @@ is_from_first_tokens = partial(is_between_tokens, left=0, right=3)
 
 def is_judge(ent):
     first_token = ent[0]
-    judge_lemma = ["juez", "jueza", "Juez", "Jueza"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in judge_lemma
         or first_token.nbor(-2).lemma_ in judge_lemma
@@ -133,16 +193,6 @@ def is_period(ent):
 
 def is_secretary(ent):
     first_token = ent[0]
-    secretarix_lemma = [
-        "secretario",
-        "secretaria",
-        "prosecretario",
-        "prosecretaria",
-        "Prosecretario",
-        "Prosecretaria",
-        "Secretario",
-        "Secretaria",
-    ]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in secretarix_lemma
         or first_token.nbor(-2).lemma_ in secretarix_lemma
@@ -152,7 +202,6 @@ def is_secretary(ent):
 
 def is_prosecutor(ent):
     first_token = ent[0]
-    prosecutor_lemma = ["fiscal", "fiscalía", "Fiscal", "Fiscalía"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in prosecutor_lemma
         or first_token.nbor(-2).lemma_ in prosecutor_lemma
@@ -162,7 +211,6 @@ def is_prosecutor(ent):
 
 def is_ombuds_person(ent):
     first_token = ent[0]
-    ombuds_person_lemma = ["defensor", "defensora", "Defensora", "Defensor"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in ombuds_person_lemma
         or first_token.nbor(-2).lemma_ in ombuds_person_lemma
@@ -172,20 +220,6 @@ def is_ombuds_person(ent):
 
 def is_accused(ent):
     first_token = ent[0]
-    accused_lemma = [
-        "acusado",
-        "acusada",
-        "imputado",
-        "imputada",
-        "infractor",
-        "infractora",
-        "Acusado",
-        "Acusada",
-        "Imputado",
-        "Imputada",
-        "Infractor",
-        "Infractora",
-    ]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in accused_lemma
         or first_token.nbor(-2).lemma_ in accused_lemma
@@ -195,7 +229,6 @@ def is_accused(ent):
 
 def is_advisor(ent):
     first_token = ent[0]
-    advisor_lemma = ["asesor", "asesora", "Asesor", "Asesora"]
     return ent.label_ in ["PER", "LOC"] and (
         first_token.nbor(-1).lemma_ in advisor_lemma
         or first_token.nbor(-2).lemma_ in advisor_lemma
@@ -212,8 +245,6 @@ def is_ip_address(ent):
 
 def is_phone(ent):
     first_token = ent[0]
-    phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico"]
-    phone_text = ["telefono", "tel", "cel"]
     return ent.label_ == "NUM" and (
         first_token.nbor(-1).lemma_ in phone_lemma
         or first_token.nbor(-2).lemma_ in phone_lemma
@@ -382,6 +413,9 @@ class EntityCustom(object):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
                 new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
+            if not is_from_first_tokens(token.i) and is_place_token(token):
+                new_ents.append(Span(doc, token.i - 1, token.i + 1, label="LOC"))
+
         for i, ent in enumerate(doc.ents):
             # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
             if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
