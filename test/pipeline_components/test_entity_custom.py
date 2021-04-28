@@ -19,8 +19,6 @@ from pipeline_components.entity_matcher import (
     page_second_left_nbors,
     measure_unit_first_right_nbors,
 )
-from pipeline_components.entity_ruler import ruler_patterns
-from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.env_case import ModelSetup
 
