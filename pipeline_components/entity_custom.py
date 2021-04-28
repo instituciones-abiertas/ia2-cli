@@ -27,15 +27,40 @@ law_left_nbors = [
     "leyes",
 ]
 
-address_first_left_nbors = ["calle", "Calle", "dirección", "Dirección",
-                    "avenida", "av.", "Avenida", "Av.", 
-                    "pasaje", "Pasaje", "Parcela", "parcela"]
-                    
+address_first_left_nbors = [
+    "calle",
+    "Calle",
+    "dirección",
+    "Dirección",
+    "avenida",
+    "av.",
+    "Avenida",
+    "Av.",
+    "pasaje",
+    "Pasaje",
+    "Parcela",
+    "parcela",
+]
+
 address_second_left_nbors = [
-    "instalación", "contramano", "sita", "sitas", "sito", "sitos",
-    "real", "domiciliado", "domiciliada", "constituido",
-    "constituida", "contramano", "intersección", "domicilio",
-    "ubicado", "registrado", "ubicada", "real"
+    "instalación",
+    "contramano",
+    "sita",
+    "sitas",
+    "sito",
+    "sitos",
+    "real",
+    "domiciliado",
+    "domiciliada",
+    "constituido",
+    "constituida",
+    "contramano",
+    "intersección",
+    "domicilio",
+    "ubicado",
+    "registrado",
+    "ubicada",
+    "real",
 ]
 
 address_connector = "en"
@@ -198,11 +223,12 @@ def is_phone(ent):
         or (first_token.nbor(-1).text == "(" and first_token.nbor(1).text == ")")
     )
 
-#TODO this function could be used in many methods, check it!
+
+# TODO this function could be used in many methods, check it!
 def is_token_in_x_left_pos(token, pos, nbors):
     try:
         return token.nbor(-pos).lower_ in nbors
-    except:
+    except Exception:
         return False
 
 
@@ -259,7 +285,12 @@ def get_aditional_left_tokens_for_address(ent):
 
 def get_entity_to_remove_if_contained_by(ent_start, ent_end, list_entities):
     for i, ent_from_list in enumerate(list_entities):
-        if ent_start >= ent_from_list.start and ent_start <= ent_from_list.end or ent_end >= ent_from_list.start and ent_end <= ent_from_list.end:
+        if (
+            ent_start >= ent_from_list.start
+            and ent_start <= ent_from_list.end
+            or ent_end >= ent_from_list.start
+            and ent_end <= ent_from_list.end
+        ):
             return ent_from_list
     return None
 
