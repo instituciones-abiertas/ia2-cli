@@ -12,7 +12,6 @@ import spacy
 import time
 import shutil
 import utils
-import csv
 from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
 from spacy.gold import GoldParse
@@ -693,7 +692,7 @@ class SpacyUtils:
 
         return misaligned_texts
 
-    def save_csv_misaligned_docs(self, nlp, filename="misaligned.json", misaligned=[]):
+    def save_json_misaligned_docs(self, nlp, filename="misaligned.json", misaligned=[]):
         """
         IMPORTANT! This function is being called when training the model.
 
@@ -707,14 +706,14 @@ class SpacyUtils:
         """
         path = f"logs/{filename}"
         logger.info("\n\n")
-        logger.info(f"[save_csv_misaligned] 💾 Saving misaligned in a {path} file")
+        logger.info(f"[save_json_misaligned] 💾 Saving misaligned in a {path} file")
         # create file if not exists
         if not os.path.exists(path):
             with open(path, "w"):
                 pass
 
         data = []
-        logger.info("\n[save_csv_misaligned] preparing rows ...")
+        logger.info("\n[save_json_misaligned] preparing rows ...")
 
         for i in range(len(misaligned)):
             text_raw = misaligned[i]["text"]
@@ -744,7 +743,7 @@ class SpacyUtils:
 
         srsly.write_json(path, data)
 
-        logger.info(f"[save_csv_misaligned] 💾 saved!! {path} file")
+        logger.info(f"[save_json_misaligned] 💾 saved!! {path} file")
 
 
     def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list, data_type):
@@ -786,7 +785,7 @@ class SpacyUtils:
                         ents_per_type_sum[key] += value["f"]
 
         if misaligned_docs:
-            self.save_csv_misaligned_docs(nlp, f"{data_type}_misaligned_docs.json", misaligned)
+            self.save_json_misaligned_docs(nlp, f"{data_type}_misaligned_docs.json", misaligned)
 
         logger.info(f'Misaligned docs for ⤴️: {misaligned_docs}/{len(texts)} ({round(100*misaligned_docs/len(texts),2)}%).')
         logger.info(f'Total by entities: {total_by_entities}.')
