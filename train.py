@@ -12,6 +12,7 @@ import spacy
 import time
 import shutil
 import utils
+import functools
 from spacy.util import minibatch, compounding, decaying
 from spacy.scorer import Scorer
 from spacy.gold import GoldParse
@@ -49,7 +50,8 @@ formatter = logging.Formatter("[%(asctime)s] (%(name)s) :: %(levelname)s :: %(me
 logger_fh.setFormatter(formatter)
 logger.addHandler(logger_fh)
 
-
+#TODO agregar una función que recorra la data (training, validation, test) y elimine los missaligned??
+# (previamente debería hacer una copia de la data)
 def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     try:
         training_data = []
@@ -234,6 +236,7 @@ class SpacyUtils:
         n_iter,
         training_data,
         path_best_model,
+        save_misaligneds_to_file,
         validation_data=[],
         testing_data=[],
         callbacks={},
@@ -318,20 +321,20 @@ class SpacyUtils:
                 # run batch callbacks
                 for cb in callbacks["on_batch"]:
                     state = cb(state, logger, nlp, optimizer, disabled_pipes)
-
+            log_annotations = True if state["i"] == 0 else False
             try:
                 # compute validation scores
                 val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
                 if settings["evaluate"] == "val":
                     logger.info("Evaluating docs from validation data")
                     val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
-                        optimizer, nlp, val_texts, val_annotations, "validation"
+                        optimizer, nlp, val_texts, val_annotations, "validation", save_misaligneds_to_file, log_annotations
                     )
 
                 # train data score
                 logger.info("Evaluating docs from training data")                
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, tr_texts, tr_annotations, "training"
+                    optimizer, nlp, tr_texts, tr_annotations, "training", save_misaligneds_to_file, log_annotations
                 )
 
                 numero_losses = losses.get("ner")
@@ -367,7 +370,7 @@ class SpacyUtils:
             if settings["evaluate"] == "test" and state["evaluate_test"]:
                 logger.info("Evaluating docs from testing data")                
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, test_texts, test_annotations, "test"
+                    optimizer, nlp, test_texts, test_annotations, "test", save_misaligneds_to_file, True
                 )
                 logger.info("############################################################")
                 logger.info("Evaluating saved model with test data")
@@ -473,6 +476,7 @@ class SpacyUtils:
             0,  # prefered save_best_model callback
             train_config["is_raw"],
             train_config["path_data_validation"],
+            train_config["save_misaligneds_to_file"],
             path_data_testing=test_ds,
             callbacks=c,
             settings=s,
@@ -489,6 +493,7 @@ class SpacyUtils:
         max_losses: float,
         is_raw: bool = True,
         path_data_validation: str = "",
+        save_misaligneds_to_file: bool = False,
         path_data_testing: str = "",
         callbacks={},
         settings={},
@@ -572,7 +577,6 @@ class SpacyUtils:
 
             # this initial save remove the pipelines from base model and is not restoring them
             #
-            #
             # we save the first model and then we update it if there is a better version of it
             # logger.info(f"💾 Saving initial model")
             # nlp.to_disk(model_path)
@@ -604,6 +608,7 @@ class SpacyUtils:
                 n_iter,
                 training_data,
                 path_best_model,
+                save_misaligneds_to_file,
                 validation_data=validation_data,
                 testing_data=testing_data,
                 callbacks=callbacks,
@@ -692,7 +697,7 @@ class SpacyUtils:
 
         return misaligned_texts
 
-    def save_json_misaligned_docs(self, nlp, filename="misaligned.json", misaligned=[]):
+    def get_total_misaligneds(self, nlp, save_it_to_file = False, filename="misaligned.json", misaligned_docs=[]):
         """
         IMPORTANT! This function is being called when training the model.
 
@@ -706,77 +711,80 @@ class SpacyUtils:
         """
         path = f"logs/{filename}"
         logger.info("\n\n")
-        logger.info(f"[save_json_misaligned] 💾 Saving misaligned in a {path} file")
-        # create file if not exists
-        if not os.path.exists(path):
-            with open(path, "w"):
-                pass
+        if save_it_to_file:
+            logger.info(f"[get_total_misaligneds] 💾 wil be saved in a {path} file")
+            # create file if not exists
+            if not os.path.exists(path):
+                with open(path, "w"):
+                    pass
 
         data = []
-        logger.info("\n[save_json_misaligned] preparing rows ...")
-
-        for i in range(len(misaligned)):
-            text_raw = misaligned[i]["text"]
+        total_misaligneds = 0
+        for i in range(len(misaligned_docs)):
+            text_raw = misaligned_docs[i]["text"]
             text_array = nlp(text_raw)
-            #to check how is being tokenized and understand why the misaligned warning
+            #to check how the doc is being tokenized and understand why the misaligned warning is arising
             # if "validation" in filename: 
                 # tok_exp = nlp.tokenizer.explain(text_raw)
                 # for t in tok_exp:
-                    # if "-" in t[1]:
-                        # print(t[1], "\t", t[0])
-            misaligned_texts = self.get_misaligned_texts(misaligned[i]["alignment_values"], text_array)
-            # print(f"tunneados!! misaligned_texts: {misaligned_texts}")
+                    # print(t[1], "\t", t[0])
+            misaligned_texts = self.get_misaligned_texts(misaligned_docs[i]["alignment_values"], text_array)
+            total_misaligneds = total_misaligneds + len(misaligned_texts)
 
-            annotations = misaligned[i]["entities"]["entities"]
-            misaligned_annotations = []
+            if save_it_to_file:
+                annotations = misaligned_docs[i]["entities"]["entities"]
+                misaligned_annotations = []
 
-            for i, annot in enumerate(annotations):
-                annotation_text = str(text_raw[annot[0]:annot[1]])
-                if any(annotation_text.replace(' ', '') in text for text in misaligned_texts):
-                    # print(f"adding to misaligned annotations: {annotation_text}")
-                    annotation = annotations[i]
-                    annotation.append(annotation_text)
-                    misaligned_annotations.append(annotation)
+                for i, annot in enumerate(annotations):
+                    annotation_text = str(text_raw[annot[0]:annot[1]])
+                    if any(annotation_text.replace(' ', '') in text for text in misaligned_texts):
+                        annotation = annotations[i]
+                        annotation.append(annotation_text)
+                        misaligned_annotations.append(annotation)
 
-            # print(f"misaligned annotations len: {len(misaligned_annotations)}")
-            data.append({"text": text_raw, "annotations": misaligned_annotations})
+                data.append({"text": text_raw[0:700], "annotations": misaligned_annotations})
 
-        srsly.write_json(path, data)
+        if save_it_to_file:
+            srsly.write_json(path, data)
+            logger.info("\n[] {path} file saved!")
 
-        logger.info(f"[save_json_misaligned] 💾 saved!! {path} file")
+        return total_misaligneds
 
 
-    def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list, data_type):
+    def evaluate_multiple(self, optimizer, nlp, texts: list, entity_occurences: list, data_type: str, save_misaligneds_to_file: bool, log_annotations: bool):
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
-        misaligned_docs = 0
+        qty_misaligned_docs = 0
         ents_per_type_sum = {}
-        misaligned = []
-        misaligned_lost_by_entities = {}
+        misaligned_docs = []
         total_by_entities = {}
+        misaligned_lost_by_entities = {}
+        only_misaligneds = 0
+        total_lost_misaligned = 1
+
+        def calculate_by_entity(totalizer):
+            for span in entities_for_text['entities']:
+                try:
+                    totalizer[span[2]] = totalizer[span[2]] + 1
+                except:
+                    totalizer[span[2]] = 1
+            return totalizer
+
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
                 scores, is_misaligned_doc, alignment_values = self.evaluate(nlp, text, entities_for_text)
-                misaligned_docs += 1 if is_misaligned_doc else 0
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
-                for span in entities_for_text['entities']:
-                    try:
-                        total_by_entities[span[2]] = total_by_entities[span[2]] + 1
-                    except:
-                        total_by_entities[span[2]] = 1
+
+                calculate_by_entity(total_by_entities)
 
                 if is_misaligned_doc:
-                    misaligned.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
-                    for span in entities_for_text['entities']:
-                        try:
-                            misaligned_lost_by_entities[span[2]] = misaligned_lost_by_entities[span[2]] + 1
-                        except:
-                            misaligned_lost_by_entities[span[2]] = 1
+                    misaligned_docs.append({"text": text, "entities":entities_for_text, "alignment_values": alignment_values})
+                    calculate_by_entity(misaligned_lost_by_entities)
 
                 for key, value in scores["ents_per_type"].items():
                     if key not in ents_per_type_sum:
@@ -784,12 +792,17 @@ class SpacyUtils:
                     else:
                         ents_per_type_sum[key] += value["f"]
 
-        if misaligned_docs:
-            self.save_json_misaligned_docs(nlp, f"{data_type}_misaligned_docs.json", misaligned)
+        if len(misaligned_docs):
+            only_misaligneds = self.get_total_misaligneds(nlp, save_misaligneds_to_file, f"{data_type}_misaligned_docs.json", misaligned_docs)
+            total_lost_misaligned = functools.reduce(lambda a,b: a+b, misaligned_lost_by_entities.values())
 
-        logger.info(f'Misaligned docs for ⤴️: {misaligned_docs}/{len(texts)} ({round(100*misaligned_docs/len(texts),2)}%).')
-        logger.info(f'Total by entities: {total_by_entities}.')
-        logger.info(f'Misaligned lost by entities: {misaligned_lost_by_entities}.')
+        if log_annotations:
+            logger.info(f'Misaligned docs for {data_type} data: {len(misaligned_docs)}/{len(texts)} ({round(100*len(misaligned_docs)/len(texts),2)}%).')
+            logger.info(f'ANNOTATIONS!')
+            logger.info(f'Total by entities: {total_by_entities}.')
+            logger.info(f'Lost entities because of misaligned: {total_lost_misaligned}.')
+            logger.info(f'Misaligned: {only_misaligneds} ({round(only_misaligneds/total_lost_misaligned*100, 2)}%).')
+
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
 
