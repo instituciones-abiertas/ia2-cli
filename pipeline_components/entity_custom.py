@@ -112,14 +112,14 @@ phone_lemma = ["teléfono", "tel", "celular", "número", "numerar", "telefónico
 phone_text = ["telefono", "tel", "cel"]
 
 
-def is_age(token, right_token, token_sent):
-    return token.like_num and right_token.text == age_right_token and age_text_in_token in token_sent.text
+def is_age(token):
+    return token.like_num and token.nbor(1).text == age_right_token and age_text_in_token in token.sent.text
 
 
-def is_caseNumber(token, first_left_token, second_left_token, token_sent):
+def is_caseNumber(token):
     return token.like_num and (
-        (first_left_token.lower_ == number_abreviated_indicator and second_left_token.lower_ == case_second_left_token)
-        or first_left_token.lower_ == case_first_left_token
+        (token.nbor(-1).lower_ == number_abreviated_indicator and token.nbor(-2).lower_ == case_second_left_token)
+        or token.nbor(-1).lower_ == case_first_left_token
     )
 
 
@@ -398,58 +398,62 @@ class EntityCustom(object):
 
     def __init__(self, nlp):
         self.nlp = nlp
+        self.new_ents = []
+
+    def add_span(self, start, end, label):
+        self.new_ents.append(Span(self.doc, start, end, label=label))
 
     def __call__(self, doc):
+        self.doc = doc
         find_fecha_resolucion = False
-        new_ents = []
-        for token in doc:
-            if not is_last(token.i, doc) and is_age(token, token.nbor(1), token.sent):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="EDAD"))
-            if not is_from_first_tokens(token.i) and is_caseNumber(token, token.nbor(-1), token.nbor(-2), token.sent):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_CAUSA"))
+        for token in self.doc:
+            if not is_last(token.i, self.doc) and is_age(token):
+                self.add_span(token.i, token.i + 1, "EDAD")
+            if not is_from_first_tokens(token.i) and is_caseNumber(token):
+                self.add_span(token.i, token.i + 1, "NUM_CAUSA")
             if not is_from_first_tokens(token.i) and is_cuijNumber(token):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_CUIJ"))
+                self.add_span(token.i, token.i + 1, "NUM_CUIJ")
             if not is_from_first_tokens(token.i) and is_actuacionNumber(token):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_ACTUACIÓN"))
+                self.add_span(token.i, token.i + 1, "NUM_ACTUACION")
             if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
-                new_ents.append(Span(doc, token.i, token.i + 1, label="NUM_EXPEDIENTE"))
+                self.add_span(token.i, token.i + 1, "NUM_EXPEDIENTE")
             if not is_from_first_tokens(token.i) and is_place_token(token):
-                new_ents.append(Span(doc, token.i - 1, token.i + 1, label="LOC"))
+                self.add_span(token.i - 1, token.i + 1, "LOC")
 
-        for i, ent in enumerate(doc.ents):
+        for i, ent in enumerate(self.doc.ents):
             # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
             if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
                 find_fecha_resolucion = True
-                new_ents.append(Span(doc, ent.start, ent.end, label="FECHA_RESOLUCION"))
+                self.add_span(ent.start, ent.end, "FECHA_RESOLUCION")
             if not is_from_first_tokens(ent.start) and is_law(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, "LEY"))
-            if not is_last(ent.start, doc) and is_period(ent):
-                new_ents.append(Span(doc, ent.start, ent.end + 1, label="PERIODO"))
+                self.add_span(ent.start, ent.end, "LEY")
+            if not is_last(ent.start, self.doc) and is_period(ent):
+                self.add_span(ent.start, ent.end + 1, "PERIODO")
             if not is_from_first_tokens(ent.start) and is_judge(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="JUEZX"))
+                self.add_span(ent.start, ent.end, "JUEZX")
             if not is_from_first_tokens(ent.start) and is_secretary(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="SECRETARIX"))
+                self.add_span(ent.start, ent.end, "SECRETARIX")
             if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="FISCAL"))
+                self.add_span(ent.start, ent.end, "FISCAL")
             if not is_from_first_tokens(ent.start) and is_ombuds_person(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="DEFENSORX"))
+                self.add_span(ent.start, ent.end, "DEFENSORX")
             if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
-                new_ents.append(Span(doc, ent.start, ent.end, label="PER"))
+                self.add_span(ent.start, ent.end, "PER")
             if not is_from_first_tokens(ent.start) and is_address(ent):
-                new_ents.append(generate_address_span(ent, new_ents, doc))
+                self.new_ents.append(generate_address_span(ent, self.new_ents, self.doc))
             if not is_from_first_tokens(ent.start) and is_ip_address(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="NUM_IP"))
+                self.add_span(ent.start, ent.end, "NUM_IP")
             if not is_from_first_tokens(ent.start) and is_phone(ent):
-                new_ents.append(Span(doc, ent.start, ent.end, label="NUM_TELÉFONO"))
+                self.add_span(ent.start, ent.end, "NUM_TELÉFONO")
             if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
-                doc.ents = remove_wrong_labeled_entity_span(doc.ents, ent)
+                self.doc.ents = remove_wrong_labeled_entity_span(self.doc.ents, ent)
             if not is_from_first_tokens(ent.start) and is_license_plate(ent):
                 start, end = get_start_end_license_plate(ent)
-                new_ents.append(Span(doc, start, end, label="PATENTE_DOMINIO"))
+                self.add_span(start, end, "PATENTE_DOMINIO")
 
-        if new_ents:
+        if self.new_ents:
             # We'd always want the new entities to be appended first because
             # filter_spans prioritizes the first occurrences on overlapping
-            doc.ents = filter_spans(new_ents + list(doc.ents))
+            self.doc.ents = filter_spans(self.new_ents + list(self.doc.ents))
 
-        return doc
+        return self.doc
