@@ -7,6 +7,10 @@ from pipeline_components.entity_custom import (
     address_second_left_nbors,
     age_right_token,
     age_text_in_token,
+    actuacion_number_indicator,
+    actuacion_nbor_token,
+    number_abreviated_indicator, 
+    expediente_indicator,
 )
 from pipeline_components.entity_matcher import (
     EntityMatcher,
@@ -25,6 +29,10 @@ import spacy
 import unittest
 
 
+"""
+Consider that Spacy parses 4 words on the sides of each token to understand its context, 
+so when creating tests we should use texts as close as possible to how they appear in the court judgments.
+"""
 class EntityCustomTest(unittest.TestCase):
     def setUp(self):
         # Loads a Spacy model
@@ -75,7 +83,7 @@ class EntityCustomTest(unittest.TestCase):
                 self.assertEqual(a_like_num_span.text, expected_period)
                 # Asserts a PERIODO span exists in the document entities
                 self.assertIn(a_like_num_span, doc.ents)
-
+ 
     def test_a_custom_entity_pipeline_detects_law_entities(self):
         nums = ["5845", "5666", "6", "12"]
         base_test_senteces = [
@@ -243,7 +251,7 @@ class EntityCustomTest(unittest.TestCase):
             self.assertEqual(expected_span.text, target_span_text)
             # Asserts a ART span exists in the document entities
             self.assertNotIn(expected_span, doc.ents)
-
+ 
     def test_a_custom_entity_pipeline_detects_address_entities(self):
         base_test_sentences = [
             (
@@ -311,7 +319,7 @@ class EntityCustomTest(unittest.TestCase):
                 # Asserts a DIRECCIÓN span exists in the document entities
                 # print(f"doc.ents {doc.ents}")
                 self.assertIn(expected_span, doc.ents)
-
+ 
     def test_a_custom_entity_pipeline_detext_fecha_resolucion(self):
         # 1) La primera fecha que encuentra si esta dentro de los primeros 100 tokens entonces lo transforma a FECHA_RESOLUCION
         # 2) Si hay más de una fecha, la segunda fecha no tiene que ser FECHA_RESOLUCION, sino que es FECHA
@@ -340,48 +348,99 @@ class EntityCustomTest(unittest.TestCase):
             doc = self.nlp(test_sentence)
             expected_span = Span(doc, start, end, label=label)
             self.assertEqual(expected_span.text, fecha)
-            self.assertIn(expected_span, doc.ents)
-
+            self.assertIn(expected_span, doc.ents) 
+ 
     def test_a_custom_entity_pipeline_detects_age(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_case_number(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_cuij_number(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_actuacion_number(self):
-        print("TODO: not implemented")
-        pass
+        base_test_senteces = [
+            (
+                "15612345/2020",
+                7,
+                8,
+                "CUIJ: IAP J-11-10022223-1/2020-0 {actuacion_nbor_token} {actuacion_number_indicator}: {nro_actuacion}",
+            ),
+            (
+                "23456101/2019",
+                11,
+                12,
+                "Número: COU 7111/2020-0 CUIJ: CAU J-11-11111114-5/2020-0 {actuacion_nbor_token} {actuacion_number_indicator}: {nro_actuacion}",
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            for nbor_word in actuacion_nbor_token:
+                test_sentence = base_test_sentece_text.format(
+                    actuacion_nbor_token=actuacion_nbor_token, actuacion_number_indicator=actuacion_number_indicator, nro_actuacion=target_span_text
+                )
+                doc = self.nlp(test_sentence)
+                expected_span = Span(doc, target_span_start, target_span_end, label="NUM_ACTUACIÓN")
+                self.assertEqual(expected_span.text, target_span_text)
+                self.assertIn(expected_span, doc.ents)        
+
 
     def test_a_custom_entity_pipeline_detects_expediente_number(self):
-        print("TODO: not implemented")
-        pass
+        base_test_senteces = [
+            (
+                "15612/20",
+                7,
+                8,
+                "Para resolver en el presente {expediente_indicator} {number_abreviated_indicator} {nro_expediente}, del registro de la Secretaría General de la Cámara de fuero",
+            ),
+            (
+                "1234/19",
+                17,
+                18,
+                "Refiere que solo tiene dos oposiciones, en cuanto a la incorporación por lectura del {expediente_indicator} civil {nro_expediente} del Juzgado Civil N° 126, en cuanto la Fiscalía requirió la incorporación in totum.",
+            ),
+            (
+                "4321/19",
+                18,
+                19,
+                "Refiere que solo tiene dos oposiciones, en cuanto a la incorporación por lectura del {expediente_indicator} penal {number_abreviated_indicator} {nro_expediente} del Juzgado Civil N° 45, en cuanto la Fiscalía requirió la incorporación in totum.",
+            ),            
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            for nbor_word in expediente_indicator:
+                test_sentence = base_test_sentece_text.format(
+                    expediente_indicator=expediente_indicator, number_abreviated_indicator=number_abreviated_indicator, nro_expediente=target_span_text
+                )
+                doc = self.nlp(test_sentence)
+                expected_span = Span(doc, target_span_start, target_span_end, label="NUM_EXPEDIENTE")
+                self.assertEqual(expected_span.text, target_span_text)
+                self.assertIn(expected_span, doc.ents)                
 
     def test_a_custom_entity_pipeline_detects_judge(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_secretary(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_prosecutor(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_ombuds_person(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_accused(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_advisor(self):
         print("TODO: not implemented")
         pass
@@ -389,7 +448,7 @@ class EntityCustomTest(unittest.TestCase):
     def test_a_custom_entity_pipeline_detects_ip_address(self):
         print("TODO: not implemented")
         pass
-
+ 
     def test_a_custom_entity_pipeline_detects_phone(self):
         print("TODO: not implemented")
         pass
