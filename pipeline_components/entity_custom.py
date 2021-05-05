@@ -410,12 +410,12 @@ class EntityCustom(object):
 
     def __init__(self, nlp):
         self.nlp = nlp
-        self.new_ents = []
 
     def add_span(self, start, end, label):
         self.new_ents.append(Span(self.doc, start, end, label=label))
 
     def __call__(self, doc):
+        self.new_ents = []
         self.doc = doc
         self.process_token_data = [
             (partial(is_last, self.doc), is_age, 0, 1, "EDAD"),
