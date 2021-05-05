@@ -1,7 +1,7 @@
 from spacy.tokens import Span
 from spacy.util import filter_spans
 import re
-from functools import partial
+from functools import partial, reduce
 
 period_rules = [
     "segundo",
@@ -166,7 +166,7 @@ def is_law(ent):
     )
 
 
-def is_last(token_id, doc):
+def is_last(doc, token_id):
     return token_id == len(doc) - 1
 
 
@@ -367,6 +367,10 @@ def is_license_plate(ent):
     )
 
 
+def is_accused_or_advisor(ent):
+    return is_accused(ent) or is_advisor(ent)
+
+
 def get_start_end_license_plate(ent):
     token = ent[0]
     first_left_token = token.nbor(-1).lower_
@@ -393,6 +397,14 @@ def remove_wrong_labeled_entity_span(ent_list, ent_to_remove):
     return [ent for ent in ent_list if not (ent_to_remove.start == ent.start and ent_to_remove.end == ent.end)]
 
 
+def process_fns(acc, data):
+    # from 3.9 We can use functools.cache on some functions
+    fn1, fn2, fn3 = data
+    if not fn1() and fn2():
+        acc.append(fn3())
+    return acc
+
+
 class EntityCustom(object):
     name = "entity_custom"
 
@@ -405,48 +417,61 @@ class EntityCustom(object):
 
     def __call__(self, doc):
         self.doc = doc
+        self.process_token_data = [
+            (partial(is_last, self.doc), is_age, 0, 1, "EDAD"),
+            (is_from_first_tokens, is_caseNumber, 0, 1, "NUM_CAUSA"),
+            (is_from_first_tokens, is_cuijNumber, 0, 1, "NUM_CUIJ"),
+            (is_from_first_tokens, is_actuacionNumber, 0, 1, "NUM_ACTUACION"),
+            (is_from_first_tokens, is_expedienteNumber, 0, 1, "NUM_EXPEDIENTE"),
+            (is_from_first_tokens, is_place_token, -1, 1, "LOC"),
+        ]
+
         find_fecha_resolucion = False
         for token in self.doc:
-            if not is_last(token.i, self.doc) and is_age(token):
-                self.add_span(token.i, token.i + 1, "EDAD")
-            if not is_from_first_tokens(token.i) and is_caseNumber(token):
-                self.add_span(token.i, token.i + 1, "NUM_CAUSA")
-            if not is_from_first_tokens(token.i) and is_cuijNumber(token):
-                self.add_span(token.i, token.i + 1, "NUM_CUIJ")
-            if not is_from_first_tokens(token.i) and is_actuacionNumber(token):
-                self.add_span(token.i, token.i + 1, "NUM_ACTUACION")
-            if not is_from_first_tokens(token.i) and is_expedienteNumber(token):
-                self.add_span(token.i, token.i + 1, "NUM_EXPEDIENTE")
-            if not is_from_first_tokens(token.i) and is_place_token(token):
-                self.add_span(token.i - 1, token.i + 1, "LOC")
+            process_data_args = [
+                (
+                    partial(fn1, token.i),
+                    partial(fn2, token),
+                    partial(Span, self.doc, token.i + start, token.i + end, label=label),
+                )
+                for fn1, fn2, start, end, label in self.process_token_data
+            ]
+            self.new_ents = reduce(process_fns, process_data_args, self.new_ents)
+
+        process_ent_data = [
+            (is_from_first_tokens, is_law, 0, 0, "LEY"),
+            (partial(is_last, self.doc), is_period, 0, 1, "PERIODO"),
+            (is_from_first_tokens, is_judge, 0, 0, "JUEZX"),
+            (is_from_first_tokens, is_secretary, 0, 0, "SECRETARIX"),
+            (is_from_first_tokens, is_prosecutor, 0, 0, "FISCAL"),
+            (is_from_first_tokens, is_ombuds_person, 0, 0, "DEFENSORX"),
+            (is_from_first_tokens, is_ip_address, 0, 0, "NUM_IP"),
+            (is_from_first_tokens, is_phone, 0, 0, "NUM_TELÉFONO"),
+            (is_from_first_tokens, is_accused_or_advisor, 0, 0, "PER"),
+        ]
 
         for i, ent in enumerate(self.doc.ents):
             # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
             if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
                 find_fecha_resolucion = True
                 self.add_span(ent.start, ent.end, "FECHA_RESOLUCION")
-            if not is_from_first_tokens(ent.start) and is_law(ent):
-                self.add_span(ent.start, ent.end, "LEY")
-            if not is_last(ent.start, self.doc) and is_period(ent):
-                self.add_span(ent.start, ent.end + 1, "PERIODO")
-            if not is_from_first_tokens(ent.start) and is_judge(ent):
-                self.add_span(ent.start, ent.end, "JUEZX")
-            if not is_from_first_tokens(ent.start) and is_secretary(ent):
-                self.add_span(ent.start, ent.end, "SECRETARIX")
-            if not is_from_first_tokens(ent.start) and is_prosecutor(ent):
-                self.add_span(ent.start, ent.end, "FISCAL")
-            if not is_from_first_tokens(ent.start) and is_ombuds_person(ent):
-                self.add_span(ent.start, ent.end, "DEFENSORX")
-            if not is_from_first_tokens(ent.start) and (is_accused(ent) or is_advisor(ent)):
-                self.add_span(ent.start, ent.end, "PER")
+
+            process_data_args = [
+                (
+                    partial(fn1, ent.start),
+                    partial(fn2, ent),
+                    partial(Span, self.doc, ent.start + start, ent.end + end, label=label),
+                )
+                for fn1, fn2, start, end, label in process_ent_data
+            ]
+            self.new_ents = reduce(process_fns, process_data_args, self.new_ents)
+
             if not is_from_first_tokens(ent.start) and is_address(ent):
                 self.new_ents.append(generate_address_span(ent, self.new_ents, self.doc))
-            if not is_from_first_tokens(ent.start) and is_ip_address(ent):
-                self.add_span(ent.start, ent.end, "NUM_IP")
-            if not is_from_first_tokens(ent.start) and is_phone(ent):
-                self.add_span(ent.start, ent.end, "NUM_TELÉFONO")
+
             if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
                 self.doc.ents = remove_wrong_labeled_entity_span(self.doc.ents, ent)
+
             if not is_from_first_tokens(ent.start) and is_license_plate(ent):
                 start, end = get_start_end_license_plate(ent)
                 self.add_span(start, end, "PATENTE_DOMINIO")
