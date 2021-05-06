@@ -38,6 +38,7 @@ from pipeline_components.entity_matcher import (
     EntityMatcher,
     ViolenceContextMatcher,
     matcher_patterns,
+    fetch_cb_by_tag,
 )
 from pipeline_components.entity_custom import EntityCustom
 
@@ -711,10 +712,8 @@ class SpacyUtils:
         ruler.add_patterns(fetch_ruler_patterns_by_tag(pipelines_tag))
         nlp.add_pipe(ruler)
 
-        article_matcher = ArticlesMatcher(nlp)
-        violence_contexts_matcher = ViolenceContextMatcher(nlp)
         entity_matcher = EntityMatcher(
-            nlp, matcher_patterns, after_callbacks=[article_matcher, violence_contexts_matcher]
+            nlp, matcher_patterns, after_callbacks=[cb(nlp) for cb in fetch_cb_by_tag(pipelines_tag)]
         )
         nlp.add_pipe(entity_matcher)
 

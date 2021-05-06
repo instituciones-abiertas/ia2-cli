@@ -9,6 +9,7 @@ from pipeline_components.entity_matcher import (
     matcher_patterns,
     violence_nbors,
     violence_types,
+    fetch_cb_by_tag,
 )
 from pipeline_components.entity_ruler import fetch_ruler_patterns_by_tag
 from spacy.pipeline import EntityRuler
@@ -28,15 +29,11 @@ class ViolenceContextMatcherTest(unittest.TestCase):
         ruler = EntityRuler(nlp, overwrite_ents=True)
         ruler.add_patterns(fetch_ruler_patterns_by_tag("todas"))
         nlp.add_pipe(ruler)
-        articles_matcher = ArticlesMatcher(nlp)
-        violence_contexts_matcher = ViolenceContextMatcher(nlp)
+
         entity_matcher = EntityMatcher(
             nlp,
             matcher_patterns,
-            after_callbacks=[
-                articles_matcher,
-                violence_contexts_matcher,
-            ],
+            after_callbacks=[cb(nlp) for cb in fetch_cb_by_tag("todas")],
         )
         nlp.add_pipe(entity_matcher)
         entity_custom = EntityCustom(nlp)
