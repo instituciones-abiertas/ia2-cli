@@ -705,9 +705,10 @@ class SpacyUtils:
 
         nlp.meta["name"] = model_name
         nlp.meta["version"] = str(model_version)
+        pipelines_tag = "todas"
 
         ruler = EntityRuler(nlp, overwrite_ents=True)
-        ruler.add_patterns(fetch_ruler_patterns_by_tag("todas"))
+        ruler.add_patterns(fetch_ruler_patterns_by_tag(pipelines_tag))
         nlp.add_pipe(ruler)
 
         article_matcher = ArticlesMatcher(nlp)
@@ -717,7 +718,7 @@ class SpacyUtils:
         )
         nlp.add_pipe(entity_matcher)
 
-        entity_custom = EntityCustom(nlp)
+        entity_custom = EntityCustom(nlp, pipelines_tag)
         nlp.add_pipe(entity_custom)
 
         nlp.to_disk(model_path)
@@ -755,8 +756,8 @@ dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
 
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[moduloMatcher.ArticlesMatcher(nlp), moduloMatcher.ViolenceContextMatcher(nlp)])
-Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[ cb(nlp) for cb in moduloMatcher.fetch_cb_by_tag("todas") ])
+Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp, "todas")
 """
 
         insert_line = 6
