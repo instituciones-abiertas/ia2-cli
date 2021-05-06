@@ -408,74 +408,233 @@ def process_fns(acc, data):
 class EntityCustom(object):
     name = "entity_custom"
 
-    def __init__(self, nlp):
+    def __init__(self, nlp, tag="todas"):
         self.nlp = nlp
+        self.tag = tag
+        self.tagged_fns_token = [
+            self.tag_fn(self.num_causa, ["judicial", "argentina"]),
+            self.tag_fn(self.edad, ["español"]),
+            self.tag_fn(self.num_cuij, ["judicial", "argentina"]),
+            self.tag_fn(self.num_actuacion, ["judicial", "argentina"]),
+            self.tag_fn(self.num_expediente, ["judicial", "argentina"]),
+            self.tag_fn(self.loc, ["lugar"]),
+        ]
+        self.tagged_fns_ent = [
+            self.tag_fn(self.fecha_resolucion, ["judicial"]),
+            self.tag_fn(self.ley, ["judicial", "argentina"]),
+            self.tag_fn(self.periodo, ["español"]),
+            self.tag_fn(self.juezx, ["judicial", "argentina"]),
+            self.tag_fn(self.secretarix, ["judicial", "argentina"]),
+            self.tag_fn(self.fiscal, ["judicial", "argentina"]),
+            self.tag_fn(self.defensorx, ["judicial", "argentina"]),
+            self.tag_fn(self.num_ip, ["internet"]),
+            self.tag_fn(self.num_telefono, ["argentina"]),
+            self.tag_fn(self.per, ["persona"]),
+            self.tag_fn(self.direccion, ["español"]),
+            self.tag_fn(self.patente_dominio, ["argentina"]),
+        ]
 
-    def add_span(self, start, end, label):
-        self.new_ents.append(Span(self.doc, start, end, label=label))
+    @staticmethod
+    def tag_fn(fn, tags):
+        return dict(fn=fn, tags=tags)
+
+    @staticmethod
+    def fetch_fn_by_tag(tagged_fns, tag):
+        fns = []
+        for tagged_fn in tagged_fns:
+            if tag == "todas" or tag in tagged_fn["tags"]:
+                fns.append(tagged_fn["fn"])
+        return fns
+
+    def num_causa(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, token.i),
+                partial(is_caseNumber, token),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_CAUSA"),
+            ),
+        )
+
+    def edad(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_last, self.doc, token.i),
+                partial(is_age, token),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="EDAD"),
+            ),
+        )
+
+    def num_cuij(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, token.i),
+                partial(is_cuijNumber, token),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_CUIJ"),
+            ),
+        )
+
+    def num_actuacion(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, token.i),
+                partial(is_actuacionNumber, token),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_ACTUACION"),
+            ),
+        )
+
+    def num_expediente(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, token.i),
+                partial(is_expedienteNumber, token),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_EXPEDIENTE"),
+            ),
+        )
+
+    def loc(self, token):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, token.i),
+                partial(is_place_token, token),
+                partial(Span, self.doc, token.i - 1, token.i + 1, label="LOC"),
+            ),
+        )
+
+    def ley(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_law, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="LEY"),
+            ),
+        )
+
+    def periodo(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(partial(is_last, self.doc, ent.start)),
+                partial(is_period, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 1, label="PERIODO"),
+            ),
+        )
+
+    def juezx(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_judge, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="JUEZX"),
+            ),
+        )
+
+    def secretarix(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_secretary, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="SECRETARIX"),
+            ),
+        )
+
+    def fiscal(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_prosecutor, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="FISCAL"),
+            ),
+        )
+
+    def defensorx(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_ombuds_person, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="DEFENSORX"),
+            ),
+        )
+
+    def num_ip(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_ip_address, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="NUM_IP"),
+            ),
+        )
+
+    def num_telefono(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_phone, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="NUM_TELÉFONO"),
+            ),
+        )
+
+    def per(self, ent):
+        return process_fns(
+            [],
+            (
+                partial(is_from_first_tokens, ent.start),
+                partial(is_accused_or_advisor, ent),
+                partial(Span, self.doc, ent.start + 0, ent.end + 0, label="PER"),
+            ),
+        )
+
+    def direccion(self, ent):
+        if not is_from_first_tokens(ent.start) and is_address(ent):
+            self.new_ents.append(generate_address_span(ent, self.new_ents, self.doc))
+        return []
+
+    def patente_dominio(self, ent):
+        new_ents = []
+        if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
+            self.doc.ents = remove_wrong_labeled_entity_span(self.doc.ents, ent)
+
+        if not is_from_first_tokens(ent.start) and is_license_plate(ent):
+            start, end = get_start_end_license_plate(ent)
+            new_ents.append(Span(self.doc, start, end, label="PATENTE_DOMINIO"))
+        return new_ents
+
+    def fecha_resolucion(self, ent):
+        new_ents = []
+        # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
+        if not self.find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
+            self.find_fecha_resolucion = True
+            new_ents.append(Span(self.doc, ent.start, ent.end, label="FECHA_RESOLUCION"))
+        return new_ents
+
+    def new_ents_by_ents(self):
+        self.find_fecha_resolucion = False
+        for i, ent in enumerate(self.doc.ents):
+            for fn in self.fetch_fn_by_tag(self.tagged_fns_ent, self.tag):
+                self.new_ents.extend(fn(ent))
+
+    def new_ents_by_token(self):
+        for token in self.doc:
+            for fn in self.fetch_fn_by_tag(self.tagged_fns_token, self.tag):
+                self.new_ents.extend(fn(token))
 
     def __call__(self, doc):
         self.new_ents = []
         self.doc = doc
-        self.process_token_data = [
-            (partial(is_last, self.doc), is_age, 0, 1, "EDAD"),
-            (is_from_first_tokens, is_caseNumber, 0, 1, "NUM_CAUSA"),
-            (is_from_first_tokens, is_cuijNumber, 0, 1, "NUM_CUIJ"),
-            (is_from_first_tokens, is_actuacionNumber, 0, 1, "NUM_ACTUACION"),
-            (is_from_first_tokens, is_expedienteNumber, 0, 1, "NUM_EXPEDIENTE"),
-            (is_from_first_tokens, is_place_token, -1, 1, "LOC"),
-        ]
-
-        find_fecha_resolucion = False
-        for token in self.doc:
-            process_data_args = [
-                (
-                    partial(fn1, token.i),
-                    partial(fn2, token),
-                    partial(Span, self.doc, token.i + start, token.i + end, label=label),
-                )
-                for fn1, fn2, start, end, label in self.process_token_data
-            ]
-            self.new_ents = reduce(process_fns, process_data_args, self.new_ents)
-
-        process_ent_data = [
-            (is_from_first_tokens, is_law, 0, 0, "LEY"),
-            (partial(is_last, self.doc), is_period, 0, 1, "PERIODO"),
-            (is_from_first_tokens, is_judge, 0, 0, "JUEZX"),
-            (is_from_first_tokens, is_secretary, 0, 0, "SECRETARIX"),
-            (is_from_first_tokens, is_prosecutor, 0, 0, "FISCAL"),
-            (is_from_first_tokens, is_ombuds_person, 0, 0, "DEFENSORX"),
-            (is_from_first_tokens, is_ip_address, 0, 0, "NUM_IP"),
-            (is_from_first_tokens, is_phone, 0, 0, "NUM_TELÉFONO"),
-            (is_from_first_tokens, is_accused_or_advisor, 0, 0, "PER"),
-        ]
-
-        for i, ent in enumerate(self.doc.ents):
-            # Modifica FECHA a FECHA_RESOLUCION: solo la primera vez, si esta el token entre 3 y 100
-            if not find_fecha_resolucion and ent.label_ in ["FECHA"] and is_between_tokens(ent.start, 3, 100):
-                find_fecha_resolucion = True
-                self.add_span(ent.start, ent.end, "FECHA_RESOLUCION")
-
-            process_data_args = [
-                (
-                    partial(fn1, ent.start),
-                    partial(fn2, ent),
-                    partial(Span, self.doc, ent.start + start, ent.end + end, label=label),
-                )
-                for fn1, fn2, start, end, label in process_ent_data
-            ]
-            self.new_ents = reduce(process_fns, process_data_args, self.new_ents)
-
-            if not is_from_first_tokens(ent.start) and is_address(ent):
-                self.new_ents.append(generate_address_span(ent, self.new_ents, self.doc))
-
-            if not is_from_first_tokens(ent.start) and could_be_an_article(ent) and ent.label_ == "PATENTE_DOMINIO":
-                self.doc.ents = remove_wrong_labeled_entity_span(self.doc.ents, ent)
-
-            if not is_from_first_tokens(ent.start) and is_license_plate(ent):
-                start, end = get_start_end_license_plate(ent)
-                self.add_span(start, end, "PATENTE_DOMINIO")
-
+        self.new_ents_by_token()
+        self.new_ents_by_ents()
         if self.new_ents:
             # We'd always want the new entities to be appended first because
             # filter_spans prioritizes the first occurrences on overlapping
