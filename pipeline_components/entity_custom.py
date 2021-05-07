@@ -482,7 +482,7 @@ class EntityCustom(object):
             (
                 partial(is_from_first_tokens, token.i),
                 partial(is_actuacionNumber, token),
-                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_ACTUACION"),
+                partial(Span, self.doc, token.i + 0, token.i + 1, label="NUM_ACTUACIÓN"),
             ),
         )
 
