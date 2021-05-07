@@ -1,6 +1,6 @@
 # Reconocimiento de Entidades Nombradas (NER)
 
-> `v1.0.1`  
+> `v1.1.0`  
 > Última actualización: `23/03/2021`
 
 ## Modelos Estadístico
