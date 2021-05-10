@@ -103,7 +103,6 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
         logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
 
-
 class SpacyUtils:
     """
     SpacyUtils: Dataturks format converter and other Spacy model utilities.
@@ -324,11 +323,13 @@ class SpacyUtils:
                 # compute validation scores
                 val_f_score, val_precision_score, val_recall_score, val_per_type_score = -1, -1, -1, -1
                 if settings["evaluate"] == "val":
+                    logger.info("Evaluating docs from validation data")
                     val_f_score, val_precision_score, val_recall_score, val_per_type_score = self.evaluate_multiple(
                         optimizer, nlp, val_texts, val_annotations
                     )
 
                 # train data score
+                logger.info("Evaluating docs from training data")                
                 f_score, precision_score, recall_score, per_type_score = self.evaluate_multiple(
                     optimizer, nlp, tr_texts, tr_annotations
                 )
@@ -364,6 +365,7 @@ class SpacyUtils:
             # during the train loop. We also want to get scores on test data
             # for each one of this models.
             if settings["evaluate"] == "test" and state["evaluate_test"]:
+                logger.info("Evaluating docs from testing data")                
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
                     optimizer, nlp, test_texts, test_annotations
                 )
@@ -640,10 +642,12 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
+            alignment_values = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
+            is_missaligned_doc = True if '-' in alignment_values else False
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
-            return scorer.scores
+            return scorer.scores, is_missaligned_doc
         except Exception as e:
             print(e)
 
@@ -651,12 +655,14 @@ class SpacyUtils:
         f_score_sum = 0
         precision_score_sum = 0
         recall_score_sum = 0
+        missaligned_docs = 0
         ents_per_type_sum = {}
         for idx in range(len(texts)):
             text = texts[idx]
             entities_for_text = entity_occurences[idx]
             with nlp.use_params(optimizer.averages):
-                scores = self.evaluate(nlp, text, entities_for_text)
+                scores, is_missaligned_doc = self.evaluate(nlp, text, entities_for_text)
+                missaligned_docs += 1 if is_missaligned_doc else 0
                 recall_score_sum += scores.get("ents_r")
                 precision_score_sum += scores.get("ents_p")
                 f_score_sum += scores.get("ents_f")
@@ -667,6 +673,7 @@ class SpacyUtils:
                     else:
                         ents_per_type_sum[key] += value["f"]
 
+        logger.info(f'Missaligned docs for ⤴️: {missaligned_docs}/{len(texts)} ({round(100*missaligned_docs/len(texts),2)}%).')
         for key, value in ents_per_type_sum.items():
             ents_per_type_sum[key] = value / len(texts)
 
