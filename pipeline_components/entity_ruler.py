@@ -587,10 +587,16 @@ nacionalidad = [
     },
 ]
 
-ruler_patterns = [
-    {"label": "CORREO_ELECTRÓNICO", "pattern": [{"LIKE_EMAIL": True}]},
-    {"label": "LEY", "pattern": [{"LOWER": "ley"}, {"LIKE_NUM": True}]},
-    {"label": "NUM_CUIT_CUIL", "pattern": [{"TEXT": {"REGEX": "^(20|23|27|30|33)([0-9]{9}|-[0-9]{8}-[0-9]{1})$"}}]},
+
+correo_electronico = [{"label": "CORREO_ELECTRÓNICO", "pattern": [{"LIKE_EMAIL": True}]}]
+
+ley = [{"label": "LEY", "pattern": [{"LOWER": "ley"}, {"LIKE_NUM": True}]}]
+
+cuit = [
+    {"label": "NUM_CUIT_CUIL", "pattern": [{"TEXT": {"REGEX": "^(20|23|27|30|33)([0-9]{9}|-[0-9]{8}-[0-9]{1})$"}}]}
+]
+
+archivos = [
     {
         "label": "NOMBRE_ARCHIVO",
         "pattern": [
@@ -601,26 +607,52 @@ ruler_patterns = [
             }
         ],
     },
-    {"label": "LINK", "pattern": [{"LIKE_URL": True}]},
-    {"label": "PASAPORTE", "pattern": [{"TEXT": {"REGEX": "^([a-zA-Z]{3}[0-9]{6})$"}}]},
-    {"label": "CBU", "pattern": [{"ORTH": "CBU"}, {"ORTH": ":", "OP": "?"}, {"IS_DIGIT": True, "LENGTH": 22}]},
+]
+
+pasaporte = [{"label": "PASAPORTE", "pattern": [{"TEXT": {"REGEX": "^([a-zA-Z]{3}[0-9]{6})$"}}]}]
+
+link = [{"label": "LINK", "pattern": [{"LIKE_URL": True}]}]
+
+cbu = [{"label": "CBU", "pattern": [{"ORTH": "CBU"}, {"ORTH": ":", "OP": "?"}, {"IS_DIGIT": True, "LENGTH": 22}]}]
+
+usuarix = [
     {
         "label": "USUARIX",
         "pattern": [{"ORTH": "del"}, {"ORTH": "usuario"}, {"ORTH": '"'}, {"IS_ALPHA": True, "OP": "+"}, {"ORTH": '"'}],
-    },
-    # Tiene entre 6 y 20 carácteres y puede ser cualquier cosa, la que los bancos dieron por defecto es text.text.text con largo no mayor a 20 carácteres.
-    # http://www.bcra.gob.ar/SistemasFinancierosYdePagos/Sistema_de_Pagos_Alias_CBU.asp
-    #    {"label": "ALIAS", "pattern": [{"TEXT": {"REGEX": "^([\w]+\.[\w]+\.[\w]+)$"}}]},
+    }
 ]
 
-ruler_patterns.extend(dni)
-ruler_patterns.extend(telefonos)
-ruler_patterns.extend(ips)
-ruler_patterns.extend(fecha_numerica)
-ruler_patterns.extend(cuij)
-ruler_patterns.extend(fecha)
-ruler_patterns.extend(nacionalidad)
-ruler_patterns.extend(bancos)
-ruler_patterns.extend(patentes)
-ruler_patterns.extend(estudios)
-ruler_patterns.extend(marcas_autos)
+
+def tag_array(arr, tags):
+    return dict(arr=arr, tags=tags)
+
+
+def fetch_ruler_patterns_by_tag(tag):
+    ruler_patterns = []
+    for tagged_pattern in tagged_patterns:
+        if tag == "todas" or tag in tagged_pattern["tags"]:
+            ruler_patterns.extend(tagged_pattern["arr"])
+    return ruler_patterns
+
+
+tagged_patterns = [
+    tag_array(dni, ["argentina", "juzgado10"]),
+    tag_array(telefonos, ["argentina", "juzgado10"]),
+    tag_array(ips, ["internet", "juzgado10"]),
+    tag_array(fecha_numerica, ["español", "juzgado10"]),
+    tag_array(cuij, ["judicial", "juzgado10"]),
+    tag_array(fecha, ["español", "juzgado10"]),
+    tag_array(nacionalidad, ["español", "juzgado10"]),
+    tag_array(bancos, ["argentina", "juzgado10"]),
+    tag_array(patentes, ["argentina", "juzgado10"]),
+    tag_array(estudios, ["argentina", "juzgado10"]),
+    tag_array(marcas_autos, ["argentina", "juzgado10"]),
+    tag_array(correo_electronico, ["internet", "juzgado10"]),
+    tag_array(ley, ["judicial", "juzgado10"]),
+    tag_array(cuit, ["argentina", "juzgado10"]),
+    tag_array(archivos, ["internet", "juzgado10"]),
+    tag_array(pasaporte, ["argentina", "juzgado10"]),
+    tag_array(link, ["internet", "juzgado10"]),
+    tag_array(cbu, ["argentina", "juzgado10"]),
+    tag_array(usuarix, ["internet", "juzgado10"]),
+]

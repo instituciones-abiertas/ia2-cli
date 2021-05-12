@@ -33,12 +33,13 @@ from callbacks import (
 )
 
 from spacy.pipeline import EntityRuler
-from pipeline_components.entity_ruler import ruler_patterns
+from pipeline_components.entity_ruler import fetch_ruler_patterns_by_tag
 from pipeline_components.entity_matcher import (
     ArticlesMatcher,
     EntityMatcher,
     ViolenceContextMatcher,
     matcher_patterns,
+    fetch_cb_by_tag,
 )
 from pipeline_components.entity_custom import EntityCustom
 
@@ -102,6 +103,7 @@ def convert_dataturks_to_spacy(dataturks_JSON_file_path, entity_list):
     except Exception as e:
         logging.exception("Unable to process " + dataturks_JSON_file_path + "\n" + "error = " + str(e))
         return None
+
 
 class SpacyUtils:
     """
@@ -432,7 +434,7 @@ class SpacyUtils:
             # during the train loop. We also want to get scores on test data
             # for each one of this models.
             if settings["evaluate"] == "test" and state["evaluate_test"]:
-                logger.info("Evaluating docs from testing data")                
+                logger.info("Evaluating docs from testing data")
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
                     optimizer, nlp, test_texts, test_annotations, "test", save_misaligneds_to_file, True
                 )
@@ -712,8 +714,8 @@ class SpacyUtils:
         try:
             doc_gold_text = nlp.make_doc(text)
             #FIXME  when training is throwing an error
-            alignment_values  = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
-            is_misaligned_doc = True if '-' in alignment_values else False    
+            alignment_values = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
+            is_misaligned_doc = True if '-' in alignment_values else False
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
             pred_value = nlp(text)
             scorer.score(pred_value, gold)
@@ -888,19 +890,18 @@ class SpacyUtils:
 
         nlp.meta["name"] = model_name
         nlp.meta["version"] = str(model_version)
+        pipelines_tag = "todas"
 
         ruler = EntityRuler(nlp, overwrite_ents=True)
-        ruler.add_patterns(ruler_patterns)
+        ruler.add_patterns(fetch_ruler_patterns_by_tag(pipelines_tag))
         nlp.add_pipe(ruler)
 
-        article_matcher = ArticlesMatcher(nlp)
-        violence_contexts_matcher = ViolenceContextMatcher(nlp)
         entity_matcher = EntityMatcher(
-            nlp, matcher_patterns, after_callbacks=[article_matcher, violence_contexts_matcher]
+            nlp, matcher_patterns, after_callbacks=[cb(nlp) for cb in fetch_cb_by_tag(pipelines_tag)]
         )
         nlp.add_pipe(entity_matcher)
 
-        entity_custom = EntityCustom(nlp)
+        entity_custom = EntityCustom(nlp, pipelines_tag)
         nlp.add_pipe(entity_custom)
 
         nlp.to_disk(model_path)
@@ -938,8 +939,8 @@ dir =  os.fspath(Path(__file__).parent)
 moduloMatcher = import_path(dir + "/{package_dir}/{package_components_dir}/entity_matcher.py")
 moduloCustom = import_path(dir + "/{package_dir}/{package_components_dir}/entity_custom.py")
 
-Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[moduloMatcher.ArticlesMatcher(nlp), moduloMatcher.ViolenceContextMatcher(nlp)])
-Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp,**cfg)
+Language.factories['entity_matcher'] = lambda nlp, **cfg: moduloMatcher.EntityMatcher(nlp, moduloMatcher.matcher_patterns, after_callbacks=[ cb(nlp) for cb in moduloMatcher.fetch_cb_by_tag("todas") ])
+Language.factories['entity_custom'] = lambda nlp, **cfg: moduloCustom.EntityCustom(nlp, "todas")
 """
 
         insert_line = 6

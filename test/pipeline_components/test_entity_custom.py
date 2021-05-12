@@ -7,6 +7,10 @@ from pipeline_components.entity_custom import (
     address_second_left_nbors,
     age_right_token,
     age_text_in_token,
+    actuacion_number_indicator,
+    actuacion_nbor_token,
+    number_abreviated_indicator,
+    expediente_indicator,
 )
 from pipeline_components.entity_matcher import (
     EntityMatcher,
@@ -15,14 +19,18 @@ from pipeline_components.entity_matcher import (
     page_second_left_nbors,
     measure_unit_first_right_nbors,
 )
-from pipeline_components.entity_ruler import ruler_patterns
-from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.env_case import ModelSetup
 
 import itertools
 import spacy
 import unittest
+
+
+"""
+Consider that Spacy parses 4 words on the sides of each token to understand its context,
+so when creating tests we should use texts as close as possible to how they appear in the court judgments.
+"""
 
 
 class EntityCustomTest(unittest.TestCase):
@@ -355,12 +363,66 @@ class EntityCustomTest(unittest.TestCase):
         pass
 
     def test_a_custom_entity_pipeline_detects_actuacion_number(self):
-        print("TODO: not implemented")
-        pass
+        base_test_senteces = [
+            (
+                "15612345/2020",
+                7,
+                8,
+                "CUIJ: IAP J-11-10022223-1/2020-0 {actuacion_nbor_token} {actuacion_number_indicator}: {nro_actuacion}",
+            ),
+            (
+                "23456101/2019",
+                11,
+                12,
+                "Número: COU 7111/2020-0 CUIJ: CAU J-11-11111114-5/2020-0 {actuacion_nbor_token} {actuacion_number_indicator}: {nro_actuacion}",
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            for nbor_word in actuacion_nbor_token:
+                test_sentence = base_test_sentece_text.format(
+                    actuacion_nbor_token=actuacion_nbor_token,
+                    actuacion_number_indicator=actuacion_number_indicator,
+                    nro_actuacion=target_span_text,
+                )
+                doc = self.nlp(test_sentence)
+                expected_span = Span(doc, target_span_start, target_span_end, label="NUM_ACTUACIÓN")
+                self.assertEqual(expected_span.text, target_span_text)
+                self.assertIn(expected_span, doc.ents)
 
     def test_a_custom_entity_pipeline_detects_expediente_number(self):
-        print("TODO: not implemented")
-        pass
+        base_test_senteces = [
+            (
+                "15612/20",
+                7,
+                8,
+                "Para resolver en el presente {expediente_indicator} {number_abreviated_indicator} {nro_expediente}, del registro de la Secretaría General de la Cámara de fuero",
+            ),
+            (
+                "1234/19",
+                17,
+                18,
+                "Refiere que solo tiene dos oposiciones, en cuanto a la incorporación por lectura del {expediente_indicator} civil {nro_expediente} del Juzgado Civil N° 126, en cuanto la Fiscalía requirió la incorporación in totum.",
+            ),
+            (
+                "4321/19",
+                18,
+                19,
+                "Refiere que solo tiene dos oposiciones, en cuanto a la incorporación por lectura del {expediente_indicator} penal {number_abreviated_indicator} {nro_expediente} del Juzgado Civil N° 45, en cuanto la Fiscalía requirió la incorporación in totum.",
+            ),
+        ]
+
+        for target_span_text, target_span_start, target_span_end, base_test_sentece_text in base_test_senteces:
+            for nbor_word in expediente_indicator:
+                test_sentence = base_test_sentece_text.format(
+                    expediente_indicator=expediente_indicator,
+                    number_abreviated_indicator=number_abreviated_indicator,
+                    nro_expediente=target_span_text,
+                )
+                doc = self.nlp(test_sentence)
+                expected_span = Span(doc, target_span_start, target_span_end, label="NUM_EXPEDIENTE")
+                self.assertEqual(expected_span.text, target_span_text)
+                self.assertIn(expected_span, doc.ents)
 
     def test_a_custom_entity_pipeline_detects_judge(self):
         print("TODO: not implemented")
