@@ -278,9 +278,12 @@ class SpacyUtils:
                     misaligned_docs_qty = misaligned_docs_qty + 1
                     self.calculate_by_entity(misaligned_lost_by_entities, annotation_ents)
 
-            with open(input_files_path, 'w') as f:
-                # import pdb; pdb.set_trace()
-                json.dump(data, f)
+            with open(input_files_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+
+            #FIXME probar si anda bien con lo del encoding, antes estaba como acá abajo
+            # with open(input_files_path, 'w') as f:
+                # json.dump(data, f)
 
             if misaligned_docs_qty:
                 total_lost_misaligned = functools.reduce(lambda a,b: a+b, misaligned_lost_by_entities.values())
@@ -374,7 +377,6 @@ class SpacyUtils:
             for batch in batches:
                 num_batches += 1
                 texts, annotations = zip(*batch)
-
                 # bz.append(len(texts))
                 nlp.update(
                     texts,  # batch of raw texts
@@ -436,7 +438,7 @@ class SpacyUtils:
             if settings["evaluate"] == "test" and state["evaluate_test"]:
                 logger.info("Evaluating docs from testing data")
                 test_f_score, test_precision_score, test_recall_score, test_per_type_score = self.evaluate_multiple(
-                    optimizer, nlp, test_texts, test_annotations, "test", save_misaligneds_to_file, True
+                    optimizer, nlp, test_texts, test_annotations, "test", save_misaligneds_to_file, log_annotations
                 )
                 logger.info("############################################################")
                 logger.info("Evaluating saved model with test data")
@@ -713,7 +715,6 @@ class SpacyUtils:
         scorer = Scorer()
         try:
             doc_gold_text = nlp.make_doc(text)
-            #FIXME  when training is throwing an error
             alignment_values = spacy.gold.biluo_tags_from_offsets(doc_gold_text, entity_ocurrences.get("entities"))
             is_misaligned_doc = True if '-' in alignment_values else False
             gold = GoldParse(doc_gold_text, entities=entity_ocurrences.get("entities"))
@@ -778,12 +779,6 @@ class SpacyUtils:
         """
         path = f"logs/{filename}"
         logger.info("\n\n")
-        if save_it_to_file:
-            logger.info(f"[get_total_misaligneds] 💾 will be saved in a {path} file")
-            # create file if not exists
-            if not os.path.exists(path):
-                with open(path, "w"):
-                    pass
 
         data = []
         total_misaligneds = 0
@@ -805,7 +800,7 @@ class SpacyUtils:
                 for i, annot in enumerate(annotations):
                     annotation_text = str(text_raw[annot[0]:annot[1]])
                     if any(annotation_text.replace(' ', '') in text for text in misaligned_texts):
-                        annotation = annotations[i]
+                        annotation = list(annotations[i])
                         annotation.append(annotation_text)
                         misaligned_annotations.append(annotation)
                 #we save a part of the text in order to be able to search it in the full text file
