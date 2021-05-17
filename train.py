@@ -245,7 +245,7 @@ class SpacyUtils:
         """
 
         #we create a backup copy of the file to be modified
-        dest = input_files_path.replace('.json', f'_copy.json')
+        dest = input_files_path.replace('.json', f'_copy_with_misaligned.json')
         orig = input_files_path
         shutil.copyfile(orig, dest)
 
@@ -765,7 +765,7 @@ class SpacyUtils:
 
         return misaligned_texts
 
-    def get_total_misaligneds(self, nlp, save_it_to_file = False, filename="misaligned.json", misaligned_docs=[]):
+    def get_total_misaligneds(self, nlp, save_it_to_file = False, filename="misaligned.json", log_annotations=True , misaligned_docs=[]):
         """
         IMPORTANT! This function is being called when training the model.
 
@@ -778,8 +778,6 @@ class SpacyUtils:
         :param misaligned: A list of misaligned docs.
         """
         path = f"logs/{filename}"
-        logger.info("\n\n")
-
         data = []
         total_misaligneds = 0
         for i in range(len(misaligned_docs)):
@@ -806,9 +804,9 @@ class SpacyUtils:
                 #we save a part of the text in order to be able to search it in the full text file
                 data.append({"text": text_raw[0:700], "annotations": misaligned_annotations})
 
-        if save_it_to_file:
+        if save_it_to_file and log_annotations:
             srsly.write_json(path, data)
-            logger.info(f"\n[] {path} file saved!")
+            logger.info(f"💾 {path} file saved!")
 
         return total_misaligneds
 
@@ -847,12 +845,12 @@ class SpacyUtils:
                         ents_per_type_sum[key] += value["f"]
 
         if len(misaligned_docs):
-            only_misaligneds = self.get_total_misaligneds(nlp, save_misaligneds_to_file, f"{data_type}_misaligned_docs.json", misaligned_docs)
+            only_misaligneds = self.get_total_misaligneds(nlp, save_misaligneds_to_file, f"{data_type}_misaligned_docs.json", log_annotations, misaligned_docs)
             total_lost_misaligned = functools.reduce(lambda a,b: a+b, misaligned_lost_by_entities.values())
 
         if log_annotations:
             logger.info(f'Misaligned docs for {data_type} data: {len(misaligned_docs)}/{len(texts)} ({round(100*len(misaligned_docs)/len(texts),2)}%).')
-            logger.info(f'ANNOTATIONS!')
+            logger.info(f'🔍 ANNOTATIONS! 🔍')
             logger.info(f'Total by entities: {total_by_entities}.')
             logger.info(f'Lost entities because of misaligned: {total_lost_misaligned}.')
             logger.info(f'Misaligned: {only_misaligneds} ({round(only_misaligneds/total_lost_misaligned*100, 2)}%).')
