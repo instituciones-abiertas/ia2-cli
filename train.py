@@ -281,10 +281,6 @@ class SpacyUtils:
             with open(input_files_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
-            #FIXME probar si anda bien con lo del encoding, antes estaba como acá abajo
-            # with open(input_files_path, 'w') as f:
-                # json.dump(data, f)
-
             if misaligned_docs_qty:
                 total_lost_misaligned = functools.reduce(lambda a,b: a+b, misaligned_lost_by_entities.values())
 
