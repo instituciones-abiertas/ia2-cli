@@ -157,7 +157,7 @@ El archivo de configuración `train_config.json` se debe generar a partir de `ex
 - `path_data_testing`: directorio de la data de testing para evaluar el modelo. Si está incluida esta opción los conjuntos de entrenamiento y validación serán combinados y utilizados para entrenamiento. Ver [F. Chollet, _Deep Learning in Python_ , cap. 4.2](https://livebook.manning.com/book/deep-learning-with-python/chapter-4/44)
 - `evaluate`: valor que determina que conjunto de datos usar para evaluar el modelo. Opciones `test` / `val`. `val` es el valor por defecto y no es necesario incluirlo
 - `is_raw`: valor booleano que determina si el archivo será convertido (cuando is_raw sea True)
-- `train_subset`:  si el valor es diferente de cero, se usará un subset del dataset tomado aleatoriamente (número entero)
+- `save_misaligneds_to_file`: valor booleano que determina si se guardarán en un archivo json las annotations que estén desalineadas y provoquen que el documento analizado se ignore para su uso
 - `model_path`: directorio del modelo custom a utilizar
 - `save_model_path`: directorio donde se guardará el modelo generado a partir del entrenamiento
 - `entities`: entidadas a ser usadas para el entrenamiento.
