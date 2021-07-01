@@ -9,7 +9,7 @@ from pipeline_components.entity_matcher import (
     matcher_patterns,
     article_left_nbors,
 )
-from pipeline_components.entity_ruler import ruler_patterns
+from pipeline_components.entity_ruler import fetch_ruler_patterns_by_tag
 from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from test.support.data_case import generate_fake_sentences
@@ -24,7 +24,7 @@ class ArticleMatcherTest(unittest.TestCase):
         # Loads a Spacy model
         nlp = ModelSetup()
         ruler = EntityRuler(nlp, overwrite_ents=True)
-        ruler.add_patterns(ruler_patterns)
+        ruler.add_patterns(fetch_ruler_patterns_by_tag("todas"))
         nlp.add_pipe(ruler)
         articles_matcher = ArticlesMatcher(nlp)
         entity_matcher = EntityMatcher(nlp, matcher_patterns, after_callbacks=[articles_matcher])
