@@ -53,7 +53,7 @@ measure_unit_first_right_nbors = ["inc", "metros", "m", "gr", "grs", "gramos", "
 
 article_left_nbors = ["artículo", "articulo", "artículos", "articulos", "art", "arts"]
 
-#Violence
+# Violence
 gender_violence_context_text = "CONTEXTO_VIOLENCIA_DE_GÉNERO"
 violence_context_text = "CONTEXTO_VIOLENCIA"
 violence_nbors = ["violencia", "violencias"]
@@ -346,3 +346,21 @@ class ViolenceContextMatcher(object):
                 ],
             ),
         ]
+
+
+def tag_cb(cb, tags):
+    return dict(cb=cb, tags=tags)
+
+
+tagged_cbs = [
+    tag_cb(ArticlesMatcher, ["judicial"]),
+    tag_cb(ViolenceContextMatcher, ["judicial"]),
+]
+
+
+def fetch_cb_by_tag(tag):
+    cbs = []
+    for tagged_cb in tagged_cbs:
+        if tag == "todas" or tag in tagged_cb["tags"]:
+            cbs.append(tagged_cb["cb"])
+    return cbs

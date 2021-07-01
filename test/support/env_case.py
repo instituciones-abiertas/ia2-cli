@@ -1,7 +1,7 @@
 import os
 import spacy
 from spacy.pipeline import EntityRuler
-from pipeline_components.entity_ruler import ruler_patterns
+from pipeline_components.entity_ruler import fetch_ruler_patterns_by_tag
 from pipeline_components.entity_custom import EntityCustom
 from pipeline_components.entity_matcher import (
     EntityMatcher,
@@ -15,6 +15,7 @@ class ModelSetup:
         self.remove = self.valid_pipe_names
         self.pipe_names = pipe_names
         self.model_path = self.get_model_path()
+        self.ruler_patterns = fetch_ruler_patterns_by_tag("todas")
         return self.setup_model(self)
 
     def get_model_path():
@@ -48,7 +49,7 @@ class ModelSetup:
 
         if "entity_ruler" in self.pipe_names:
             ruler = EntityRuler(self.nlp, overwrite_ents=True)
-            ruler.add_patterns(ruler_patterns)
+            ruler.add_patterns(self.ruler_patterns)
             self.nlp.add_pipe(ruler)
 
         if "entity_matcher" in self.pipe_names:
