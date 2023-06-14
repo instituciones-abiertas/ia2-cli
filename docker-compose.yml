@@ -1,0 +1,70 @@
+version: "3.10"
+services:
+    ia2-core:
+        image: ${CORE_IMAGE}
+        container_name: ia2-core
+        build:
+            context: .
+            dockerfile: ./build/core/Dockerfile
+            args:
+                - PYTHON_VERSION=${PYTHON_VERSION}
+                - PIP_VERSION=${PIP_VERSION}
+                - CUDA_VERSION=${CUDA_VERSION}
+                - TORCH_VERSION=${TORCH_VERSION}
+                - TEST_MODEL_FILE=${TEST_MODEL_FILE}
+        volumes:
+            - $PWD/${DATASETS_VOLUME_MOUNT}
+            - $PWD/${RESOURCES_VOLUME_MOUNT}
+        env_file:
+            - .env
+
+    ia2-jupyter:
+        image: ${JUPYTER_IMAGE}
+        container_name: ia2-jupyter
+        build:
+            context: .
+            dockerfile: ./build/jupyter/Dockerfile
+            args:
+                - CORE_IMAGE=${CORE_IMAGE}
+
+    ia2-jupyter-gpu:
+        network_mode: host
+        image: ${JUPYTER_IMAGE}
+        container_name: ia2-jupyter-gpu
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - capabilities: [ gpu ]
+        shm_size: '8gb'
+        volumes:
+            - $PWD/${SRC_VOLUME_MOUNT}
+            - $PWD/${NOTEBOOKS_VOLUME_MOUNT}
+            - $PWD/${RESOURCES_VOLUME_MOUNT}
+        env_file:
+            - .env
+
+    ia2-jupyter-cpu:
+        network_mode: host
+        image: ${JUPYTER_IMAGE}
+        container_name: ia2-jupyter-cpu
+        shm_size: '8gb'
+        volumes:
+            - $PWD/${SRC_VOLUME_MOUNT}
+            - $PWD/${NOTEBOOKS_VOLUME_MOUNT}
+            - $PWD/${RESOURCES_VOLUME_MOUNT}
+        env_file:
+            - .env
+
+    ia2-core-test-cpu:
+        network_mode: host
+        image: ${CORE_IMAGE}
+        command: sh -c " cd .. && ${TEST_COMMAND}"
+        container_name: ia2-core-test-cpu
+        shm_size: '8gb'
+        volumes:
+            - $PWD/${TEST_VOLUME_MOUNT}
+            - $PWD/${SRC_VOLUME_MOUNT}
+            - $PWD/${RESOURCES_VOLUME_MOUNT}
+        env_file:
+            - .env

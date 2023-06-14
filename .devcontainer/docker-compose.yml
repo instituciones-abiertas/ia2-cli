@@ -1,0 +1,14 @@
+version: "3.10"
+services:
+    ia2-devcontainer:
+        network_mode: host
+        image: ia2-devcontainer
+        container_name: ia2-devcontainer
+        build:
+            context: ..
+            dockerfile: .devcontainer/Dockerfile
+        volumes:
+            - ..:/workspace:cached
+        # Please do not comment or remove this line!
+        command: /bin/sh -c "while sleep 1000; do :; done"
+ 

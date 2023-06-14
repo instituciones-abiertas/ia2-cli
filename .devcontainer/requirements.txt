@@ -1,0 +1,5 @@
+# code style
+
+black==22.8.0
+flake8==5.0.4
+pylint==2.15.2
