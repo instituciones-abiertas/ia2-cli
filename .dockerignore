@@ -1,0 +1,10 @@
+.vscode
+.python-version
+Pipfile.lock
+**/__pycache__
+**/*.ipynb_checkpoints
+**/*.egg-info
+
+.git/
+resources/
+notebooks/
